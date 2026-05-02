@@ -73,11 +73,12 @@ class TribeVideoBackend:
             if self._model is None:
                 device = self.device
                 model_dir = self._resolve_official_model_dir(device)
+                config_device = _runtime_config_device(device)
                 self._model = TribeModel.from_pretrained(
                     model_dir,
                     cache_folder=CACHE_DIR,
                     device=device,
-                    config_update=_build_runtime_config_update(device),
+                    config_update=_build_runtime_config_update(config_device),
                 )
             return self._model
 
@@ -94,7 +95,10 @@ class TribeVideoBackend:
             local_dir=MODEL_SNAPSHOT_DIR,
             local_dir_use_symlinks=False,
         )
-        self._model_dir = _prepare_runtime_model_dir(Path(snapshot_path), device)
+        self._model_dir = _prepare_runtime_model_dir(
+            Path(snapshot_path),
+            _runtime_config_device(device),
+        )
         return self._model_dir
 
     def predict_video(self, video_path: str | Path) -> TribeRunResult:
@@ -273,6 +277,13 @@ def _mps_is_available() -> bool:
     except Exception:
         return False
     return True
+
+
+def _runtime_config_device(device: str) -> str:
+    # neuralset extractor schemas currently accept auto/cpu/cuda/accelerate,
+    # not a raw torch "mps" device. Keep feature extraction on CPU while the
+    # loaded TRIBE model can still move to MPS for the prediction stage.
+    return "cpu" if device == "mps" else device
 
 
 def _build_runtime_config_update(device: str) -> dict[str, Any]:
