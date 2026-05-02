@@ -6,6 +6,9 @@ import os
 from pathlib import Path
 from typing import Any
 
+if os.environ.get("TRIBE_ENABLE_MPS", "").strip().lower() in {"1", "true", "yes"}:
+    os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+
 import torch
 import whisper
 
@@ -18,6 +21,11 @@ ensure_local_ffmpeg_on_path()
 DEFAULT_CACHE_DIR = Path.home() / "Downloads" / "tribe_cache"
 WHISPER_CACHE_DIR = Path(os.environ.get("TRIBE_CACHE_DIR", DEFAULT_CACHE_DIR)) / "whisper"
 WHISPER_MODEL_NAME = "base"
+ENABLE_MPS = os.environ.get("TRIBE_ENABLE_MPS", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 
 @dataclass
@@ -54,7 +62,7 @@ class SpeechTranscriber:
 
     @property
     def device(self) -> str:
-        return "cuda" if torch.cuda.is_available() else "cpu"
+        return _select_speech_device()
 
     def load(self) -> Any:
         with self._lock:
@@ -150,3 +158,44 @@ class SpeechTranscriber:
             words=words,
             segments=segments,
         )
+
+
+def _select_speech_device() -> str:
+    requested_device = (
+        os.environ.get("TRIBE_SPEECH_DEVICE")
+        or os.environ.get("TRIBE_DEVICE")
+        or "auto"
+    ).strip().lower()
+    if requested_device == "cpu":
+        return "cpu"
+    if requested_device == "cuda":
+        return "cuda" if _cuda_is_available() else "cpu"
+    if requested_device == "mps":
+        return "mps" if _mps_is_available() else "cpu"
+
+    if _cuda_is_available():
+        return "cuda"
+    if ENABLE_MPS and _mps_is_available():
+        return "mps"
+    return "cpu"
+
+
+def _cuda_is_available() -> bool:
+    if not torch.cuda.is_available():
+        return False
+    try:
+        torch.empty(1).to("cuda")
+    except Exception:
+        return False
+    return True
+
+
+def _mps_is_available() -> bool:
+    mps_backend = getattr(torch.backends, "mps", None)
+    if mps_backend is None or not mps_backend.is_available():
+        return False
+    try:
+        torch.empty(1).to("mps")
+    except Exception:
+        return False
+    return True

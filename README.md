@@ -100,6 +100,7 @@ Full workflow notes: [docs/WORKFLOWS.md](docs/WORKFLOWS.md)
 |-- static/vendor/                 # Local browser dependencies
 |-- runtime_media/                 # Local runtime uploads/reports, ignored by Git
 |-- docs/INSTALL_WINDOWS.md        # Windows setup guide
+|-- docs/INSTALL_MACOS.md          # macOS setup guide
 `-- docs/TROUBLESHOOTING.md        # Common issues
 ```
 
@@ -133,26 +134,34 @@ http://127.0.0.1:8000
 
 Full setup notes: [docs/INSTALL_WINDOWS.md](docs/INSTALL_WINDOWS.md)
 
-## macOS support status
+## Quick start on macOS
 
-macOS support is planned but not yet implemented. The current app is
-Windows-first, while the core TRIBE v2 runtime should be portable with a
-platform-safe launcher, Chrome detection, and CPU/MPS device handling.
+For Apple Silicon Macs:
 
-See [docs/MACOS_SUPPORT_PLAN.md](docs/MACOS_SUPPORT_PLAN.md) for the proposed
-implementation plan.
+1. Install Python 3.11 or newer.
+2. Open a terminal in the project folder.
+3. Run `./start_macos.sh`.
+4. Keep the terminal open while the app prepares itself.
+5. When setup is complete, run `./start_macos.sh` again.
+6. The app should open in your browser.
+
+CPU mode is the safest default on macOS. Apple Silicon MPS acceleration is
+available as an opt-in experimental path with `TRIBE_ENABLE_MPS=1`.
+
+Full setup notes: [docs/INSTALL_MACOS.md](docs/INSTALL_MACOS.md)
+Implementation notes: [docs/MACOS_SUPPORT_PLAN.md](docs/MACOS_SUPPORT_PLAN.md)
 
 ## Requirements
 
 Recommended local setup:
 
-- Windows 10/11 64-bit
 - Python 3.11
 - 16 GB RAM
 - Modern 8-core CPU or better
-- NVIDIA GPU
-- 6 GB VRAM minimum, 12 GB+ preferred
 - 30 GB+ free disk space, preferably on SSD
+
+For Windows GPU acceleration, an NVIDIA GPU with 6 GB VRAM minimum is
+recommended. For macOS, Apple Silicon with 24 GB unified memory is preferred.
 
 ## Runtime data and privacy
 
@@ -164,14 +173,14 @@ That folder is intentionally ignored by Git. Do not commit runtime media, report
 
 Run a syntax check:
 
-```powershell
+```bash
 python -m py_compile app.py bootstrap_models.py tribe_runtime.py speech_runtime.py official_report.py review_engine.py report_localization.py pdf_report.py brain_visualization.py runtime_setup.py
 ```
 
 Run a smoke test with a local video:
 
-```powershell
-python smoke_test.py C:\path\to\test-video.mp4
+```bash
+python smoke_test.py /path/to/test-video.mp4
 ```
 
 ## License and use

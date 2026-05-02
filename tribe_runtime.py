@@ -12,6 +12,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+if os.environ.get("TRIBE_ENABLE_MPS", "").strip().lower() in {"1", "true", "yes"}:
+    os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+
 import pandas as pd
 import torch
 import tribev2.eventstransforms as tribev2_eventstransforms
@@ -19,7 +22,7 @@ import tribev2.eventstransforms as tribev2_eventstransforms
 from runtime_setup import ensure_local_ffmpeg_on_path
 
 
-if hasattr(pathlib, "WindowsPath"):
+if os.name == "nt" and hasattr(pathlib, "WindowsPath"):
     pathlib.PosixPath = pathlib.WindowsPath  # type: ignore[assignment]
 
 from tribev2 import TribeModel
@@ -32,6 +35,11 @@ DEFAULT_CACHE_DIR = Path.home() / "Downloads" / "tribe_cache"
 CACHE_DIR = Path(os.environ.get("TRIBE_CACHE_DIR", DEFAULT_CACHE_DIR))
 MODEL_SNAPSHOT_DIR = CACHE_DIR / "official_model_repo"
 ENABLE_TEXT_EVENTS = os.environ.get("TRIBE_ENABLE_TEXT_EVENTS", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
+ENABLE_MPS = os.environ.get("TRIBE_ENABLE_MPS", "").strip().lower() in {
     "1",
     "true",
     "yes",
@@ -231,13 +239,40 @@ def _drop_text_events_unless_enabled(events: pd.DataFrame) -> pd.DataFrame:
 
 
 def _select_torch_device() -> str:
-    if not torch.cuda.is_available() or torch.version.cuda is None:
+    requested_device = os.environ.get("TRIBE_DEVICE", "auto").strip().lower() or "auto"
+    if requested_device == "cpu":
         return "cpu"
+    if requested_device == "cuda":
+        return "cuda" if _cuda_is_available() else "cpu"
+    if requested_device == "mps":
+        return "mps" if _mps_is_available() else "cpu"
+
+    if _cuda_is_available():
+        return "cuda"
+    if ENABLE_MPS and _mps_is_available():
+        return "mps"
+    return "cpu"
+
+
+def _cuda_is_available() -> bool:
+    if not torch.cuda.is_available() or torch.version.cuda is None:
+        return False
     try:
         torch.empty(1).to("cuda")
     except Exception:
-        return "cpu"
-    return "cuda"
+        return False
+    return True
+
+
+def _mps_is_available() -> bool:
+    mps_backend = getattr(torch.backends, "mps", None)
+    if mps_backend is None or not mps_backend.is_available():
+        return False
+    try:
+        torch.empty(1).to("mps")
+    except Exception:
+        return False
+    return True
 
 
 def _build_runtime_config_update(device: str) -> dict[str, Any]:

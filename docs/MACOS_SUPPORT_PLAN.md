@@ -1,7 +1,8 @@
 # macOS Support Plan
 
 This document outlines the work required to make TRIBE Review MVP run on
-macOS in addition to the current Windows-first workflow.
+macOS in addition to the current Windows-first workflow, and records the
+implementation status for the macOS support branch.
 
 The expected first target is reliable local execution on Apple Silicon using
 CPU fallback, with optional experimental MPS acceleration. CUDA-class
@@ -24,9 +25,30 @@ performance should not be assumed on macOS.
 - Training TRIBE v2 locally on macOS.
 - Bundling model weights, Whisper weights, or Hugging Face credentials.
 
-## Current macOS Blockers
+## Implementation Status
 
-1. `tribe_runtime.py` applies a pathlib monkeypatch on all platforms:
+Completed in this branch:
+
+- Added `start_macos.sh`.
+- Added `docs/INSTALL_MACOS.md`.
+- Updated README and troubleshooting docs.
+- Added macOS Chrome, Edge, and Chromium detection.
+- Guarded the Windows-only pathlib compatibility patch.
+- Added `TRIBE_DEVICE`, `TRIBE_SPEECH_DEVICE`, and opt-in `TRIBE_ENABLE_MPS`
+  handling.
+- Updated bootstrap messages to point at the platform launcher.
+
+Remaining validation:
+
+- Full dependency installation on a clean Apple Silicon machine.
+- First-run Hugging Face model bootstrap on macOS.
+- Short-video CPU smoke test.
+- Short-video MPS opt-in smoke test.
+- PDF export through the browser UI.
+
+## Original macOS Blockers
+
+1. `tribe_runtime.py` applied a pathlib monkeypatch on all platforms:
 
    ```python
    if hasattr(pathlib, "WindowsPath"):
@@ -34,8 +56,8 @@ performance should not be assumed on macOS.
    ```
 
    On macOS, `WindowsPath` exists as a class but cannot be instantiated. This
-   can break normal `Path(...)` construction. The patch should only run on
-   Windows if it is still needed there.
+   can break normal `Path(...)` construction. This branch guards the patch so
+   it only runs on Windows.
 
 2. The launcher is Windows-specific:
 
@@ -45,14 +67,14 @@ performance should not be assumed on macOS.
    - PowerShell browser opening
    - CUDA PyTorch installation logic
 
-3. PDF export only searches Windows browser paths in `pdf_report.py`.
+3. PDF export only searched Windows browser paths in `pdf_report.py`.
 
-4. Device selection only supports CUDA or CPU:
+4. Device selection only supported CUDA or CPU:
 
    - `tribe_runtime.py`
    - `speech_runtime.py`
 
-5. Installation docs and troubleshooting are Windows-centered.
+5. Installation docs and troubleshooting were Windows-centered.
 
 6. The app has not been validated against Apple Silicon dependency wheels for
    TRIBE v2, PyTorch, openai-whisper, MoviePy, FFmpeg, and plotting extras.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -36,6 +37,10 @@ def _is_ready() -> bool:
     except (json.JSONDecodeError, OSError):
         return False
     return bool(data.get("ready"))
+
+
+def _launcher_name() -> str:
+    return "Start_TRIBE_Review.cmd" if os.name == "nt" else "./start_macos.sh"
 
 
 def main() -> int:
@@ -79,7 +84,7 @@ def main() -> int:
         _write_ready(CACHE_DIR)
         _log("")
         _log("Setup complete.")
-        _log("Close this terminal, then start the app again with Start_TRIBE_Review.cmd.")
+        _log(f"Close this terminal, then start the app again with {_launcher_name()}.")
         _log("After this first setup, launches and analyses should start much faster.")
         return 0
     except Exception as exc:
@@ -88,7 +93,7 @@ def main() -> int:
         _log(f"Error: {exc}")
         _log("")
         _log("Check your internet connection and make sure Hugging Face access is available if the model download asks for it.")
-        _log("After fixing the issue, run Start_TRIBE_Review.cmd again.")
+        _log(f"After fixing the issue, run {_launcher_name()} again.")
         return 1
 
 
