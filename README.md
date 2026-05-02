@@ -133,6 +133,15 @@ http://127.0.0.1:8000
 
 Full setup notes: [docs/INSTALL_WINDOWS.md](docs/INSTALL_WINDOWS.md)
 
+## macOS support status
+
+macOS support is planned but not yet implemented. The current app is
+Windows-first, while the core TRIBE v2 runtime should be portable with a
+platform-safe launcher, Chrome detection, and CPU/MPS device handling.
+
+See [docs/MACOS_SUPPORT_PLAN.md](docs/MACOS_SUPPORT_PLAN.md) for the proposed
+implementation plan.
+
 ## Requirements
 
 Recommended local setup:
