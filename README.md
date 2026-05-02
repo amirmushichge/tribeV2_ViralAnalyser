@@ -1,6 +1,6 @@
 # TRIBE Review MVP
 
-Private local web app for analyzing short video ads with Meta TRIBE v2 and presenting the result as an editing-friendly review.
+Private local web app for analyzing short video ads with Meta TRIBE v2 and presenting the result as an editing-friendly review. The app supports local Windows and macOS runs.
 
 The app runs the official TRIBE v2 inference path, visualizes the predicted brain-response curve and heatmap, and adds a practical recommendation layer for comparing cuts and finding weak moments in the timeline.
 
@@ -149,7 +149,6 @@ CPU mode is the safest default on macOS. Apple Silicon MPS acceleration is
 available as an opt-in experimental path with `TRIBE_ENABLE_MPS=1`.
 
 Full setup notes: [docs/INSTALL_MACOS.md](docs/INSTALL_MACOS.md)
-Implementation notes: [docs/MACOS_SUPPORT_PLAN.md](docs/MACOS_SUPPORT_PLAN.md)
 
 ## Requirements
 
