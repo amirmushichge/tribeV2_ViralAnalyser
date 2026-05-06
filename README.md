@@ -89,6 +89,7 @@ Full workflow notes: [docs/WORKFLOWS.md](docs/WORKFLOWS.md)
 ```text
 .
 |-- app.py                         # FastAPI app and report routes
+|-- worker.py                      # Minimal Worthy worker endpoint
 |-- bootstrap_models.py            # First-launch dependency and model preparation
 |-- tribe_runtime.py               # TRIBE v2 model loading and inference wrapper
 |-- official_report.py             # Official-output report layer
@@ -164,6 +165,18 @@ Run a smoke test with a local video:
 ```powershell
 python smoke_test.py C:\path\to\test-video.mp4
 ```
+
+Run the Worthy worker endpoint locally:
+
+```powershell
+set FIREBASE_STORAGE_BUCKET=your-bucket-name
+uvicorn worker:app --host 0.0.0.0 --port 8000
+```
+
+`POST /scan` accepts Worthy's `scanId`, `partnerId`, `source`, `inputUrl`, and
+`outputPrefix`, runs official TRIBE inference, uploads `{outputPrefix}/report.json`
+to Cloud Storage, and returns Worthy's narrow `{status, summary, rawReportPath}`
+contract.
 
 ## License and use
 
