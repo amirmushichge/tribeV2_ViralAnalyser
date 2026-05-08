@@ -5,6 +5,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from io import BytesIO
 import json
+import os
 from pathlib import Path
 import re
 from typing import Any
@@ -35,7 +36,7 @@ from tribe_runtime import TribeVideoBackend
 apply_review_engine_patch()
 
 APP_DIR = Path(__file__).resolve().parent
-MEDIA_DIR = APP_DIR / "runtime_media"
+MEDIA_DIR = Path(os.environ.get("TRIBE_MEDIA_DIR", APP_DIR / "runtime_media"))
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
@@ -234,7 +235,8 @@ async def _analyze_upload(
     target_path.write_bytes(await upload.read())
 
     variant_name = Path(upload.filename or target_path.name).stem
-    run = backend.predict_video(target_path)
+    import asyncio
+    run = await asyncio.get_event_loop().run_in_executor(None, backend.predict_video, target_path)
     result = generate_official_report(
         target_path,
         run,
