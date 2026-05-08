@@ -19,7 +19,7 @@ import tribev2.eventstransforms as tribev2_eventstransforms
 from runtime_setup import ensure_local_ffmpeg_on_path
 
 
-if hasattr(pathlib, "WindowsPath"):
+if os.name == "nt":
     pathlib.PosixPath = pathlib.WindowsPath  # type: ignore[assignment]
 
 from tribev2 import TribeModel
@@ -36,6 +36,9 @@ ENABLE_TEXT_EVENTS = os.environ.get("TRIBE_ENABLE_TEXT_EVENTS", "").strip().lowe
     "true",
     "yes",
 }
+
+# When TRIBE_USE_MODAL=1, inference is offloaded to a deployed Modal function.
+_USE_MODAL = os.environ.get("TRIBE_USE_MODAL", "").strip().lower() in {"1", "true", "yes"}
 
 
 @dataclass
@@ -90,15 +93,23 @@ class TribeVideoBackend:
         return self._model_dir
 
     def predict_video(self, video_path: str | Path) -> TribeRunResult:
+        if _USE_MODAL:
+            return _predict_via_modal(video_path)
         model = self.load()
-        self._ensure_uvx_on_path()
-        self._ensure_official_transcript_helper()
-        original_cuda_check = tribev2_eventstransforms.torch.cuda.is_available
-        tribev2_eventstransforms.torch.cuda.is_available = lambda: False
+        
+        is_modal_container = os.environ.get("IS_MODAL") == "1"
+        
+        if not is_modal_container:
+            self._ensure_uvx_on_path()
+            self._ensure_official_transcript_helper()
+            original_cuda_check = tribev2_eventstransforms.torch.cuda.is_available
+            tribev2_eventstransforms.torch.cuda.is_available = lambda: False
+            
         try:
             events = model.get_events_dataframe(video_path=str(Path(video_path)))
         finally:
-            tribev2_eventstransforms.torch.cuda.is_available = original_cuda_check
+            if not is_modal_container:
+                tribev2_eventstransforms.torch.cuda.is_available = original_cuda_check
         events = _drop_text_events_unless_enabled(events)
         preds, segments = model.predict(events=events, verbose=False)
         timestamps = [self._segment_timestamp(segment) for segment in segments]
@@ -241,11 +252,13 @@ def _select_torch_device() -> str:
 
 
 def _build_runtime_config_update(device: str) -> dict[str, Any]:
-    image_batch_size = 1
-    video_batch_size = 1
+    # On GPU (A10G, 24GB VRAM) use large batches; fall back to 1 on CPU
+    image_batch_size = 32 if device == "cuda" else 1
+    video_batch_size = 16 if device == "cuda" else 1
+    main_batch_size = 8 if device == "cuda" else 1
     return {
-        "data.num_workers": 0,
-        "data.batch_size": 1,
+        "data.num_workers": 4 if device == "cuda" else 0,
+        "data.batch_size": main_batch_size,
         "data.text_feature.device": device,
         "data.audio_feature.device": device,
         "data.image_feature.image.device": device,
@@ -281,3 +294,31 @@ def _prepare_runtime_model_dir(snapshot_dir: Path, device: str) -> Path:
             runtime_checkpoint.write_bytes(source_checkpoint.read_bytes())
 
     return runtime_dir
+
+
+def _predict_via_modal(video_path: str | Path) -> TribeRunResult:
+    """Call the deployed Modal inference function instead of running locally."""
+    import numpy as np
+
+    try:
+        import modal
+    except ImportError as exc:
+        raise RuntimeError(
+            "TRIBE_USE_MODAL is set but the 'modal' package is not installed. "
+            "Run: pip install modal"
+        ) from exc
+
+    instance = modal.Cls.from_name("tribe-inference", "TribeInference")()
+    video_bytes = Path(video_path).read_bytes()
+    result = instance.predict_video.remote(video_bytes, filename=Path(video_path).name)
+
+    return TribeRunResult(
+        preds=np.array(result["preds"], dtype=result.get("preds_dtype", "float32")),
+        timestamps=result["timestamps"],
+        device=result["device"],
+        modalities=result["modalities"],
+        events_count=result["events_count"],
+        mesh_level=result["mesh_level"],
+        subject_model=result["subject_model"],
+        hemodynamic_lag_seconds=result["hemodynamic_lag_seconds"],
+    )
