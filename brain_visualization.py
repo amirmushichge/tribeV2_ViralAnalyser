@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from io import BytesIO
 from functools import lru_cache
 from math import ceil
 from typing import Any
 
 import numpy as np
-from tribev2.plotting.cortical import PlotBrainNilearn
 
 
 BRAIN_MESH_LEVEL = "fsaverage5"
@@ -13,6 +13,8 @@ MIN_BRAIN_FRAMES = 24
 MAX_BRAIN_FRAMES = 40
 TARGET_BRAIN_FPS = 1.45
 SIGNAL_QUANTIZATION = 255
+POSTER_DPI = 180
+POSTER_SIZE_INCHES = (6.4, 4.0)
 
 REGION_DEFINITIONS = (
     {
@@ -144,6 +146,63 @@ def build_brain_simulation(
     }
 
 
+def render_surface_poster(simulation: dict[str, Any], peak_time_seconds: float | None = None) -> bytes:
+    mesh = simulation.get("mesh")
+    frames = simulation.get("frames")
+    if not isinstance(mesh, dict) or not isinstance(frames, list) or not frames:
+        raise RuntimeError("TRIBE brain simulation is missing mesh frames.")
+
+    coords = _surface_coords(mesh, "inflated")
+    faces = np.asarray(mesh.get("faces"), dtype=int).reshape(-1, 3)
+    bg_map = np.asarray(mesh.get("bg_map"), dtype=float) / SIGNAL_QUANTIZATION
+    frame = _poster_frame(frames, peak_time_seconds)
+    signal = np.asarray(frame.get("signal"), dtype=float) / SIGNAL_QUANTIZATION
+
+    if coords.ndim != 2 or coords.shape[1] != 3:
+        raise RuntimeError("TRIBE brain simulation surface coordinates are invalid.")
+    if faces.ndim != 2 or faces.shape[1] != 3:
+        raise RuntimeError("TRIBE brain simulation faces are invalid.")
+    if len(bg_map) != len(coords) or len(signal) != len(coords):
+        raise RuntimeError("TRIBE brain simulation vertex arrays do not match the surface.")
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
+    face_signal = np.mean(signal[faces], axis=1)
+    face_bg = np.mean(bg_map[faces], axis=1)
+    face_colors = _poster_face_colors(coords, faces, face_bg, face_signal)
+
+    fig = plt.figure(figsize=POSTER_SIZE_INCHES, dpi=POSTER_DPI)
+    fig.patch.set_facecolor("#05070b")
+    ax = fig.add_subplot(111, projection="3d")
+    ax.set_facecolor("#05070b")
+    ax.set_axis_off()
+    ax.set_proj_type("persp", focal_length=0.52)
+
+    triangles = coords[faces]
+    surface = Poly3DCollection(
+        triangles,
+        facecolors=face_colors,
+        edgecolors=(1, 1, 1, 0.018),
+        linewidths=0.08,
+        antialiased=False,
+    )
+    surface.set_zsort("average")
+    ax.add_collection3d(surface)
+
+    _set_equal_3d_limits(ax, coords)
+    ax.view_init(elev=8, azim=268, roll=-1)
+    fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+
+    buffer = BytesIO()
+    fig.savefig(buffer, format="png", facecolor=fig.get_facecolor(), pad_inches=0)
+    plt.close(fig)
+    return buffer.getvalue()
+
+
 def _build_time_axis(total_frames: int, timestamps: list[float]) -> np.ndarray:
     if timestamps and len(timestamps) == total_frames:
         out = np.asarray(timestamps, dtype=float)
@@ -216,6 +275,99 @@ def _compute_region_scores(signal: np.ndarray, region_masks: list[np.ndarray]) -
     return scores, peak_scores
 
 
+def _surface_coords(mesh: dict[str, Any], surface_name: str) -> np.ndarray:
+    surfaces = mesh.get("surfaces")
+    if not isinstance(surfaces, dict):
+        raise RuntimeError("TRIBE brain simulation is missing surfaces.")
+
+    raw = surfaces.get(surface_name) or surfaces.get(mesh.get("default_surface")) or surfaces.get("normal")
+    if raw is None:
+        raise RuntimeError("TRIBE brain simulation is missing surface coordinates.")
+    return np.asarray(raw, dtype=float).reshape(-1, 3)
+
+
+def _poster_frame(frames: list[dict[str, Any]], peak_time_seconds: float | None) -> dict[str, Any]:
+    if peak_time_seconds is not None:
+        return min(
+            frames,
+            key=lambda frame: abs(float(frame.get("seconds", 0.0)) - peak_time_seconds),
+        )
+
+    return max(
+        frames,
+        key=lambda frame: float(np.mean(np.asarray(frame.get("signal", []), dtype=float)))
+        if frame.get("signal")
+        else 0.0,
+    )
+
+
+def _poster_face_colors(
+    coords: np.ndarray,
+    faces: np.ndarray,
+    bg_map: np.ndarray,
+    signal: np.ndarray,
+) -> np.ndarray:
+    display_signal = _poster_display_signal(signal)
+    normals = _face_normals(coords, faces)
+    light = np.asarray([-0.24, -0.72, 0.65], dtype=float)
+    light /= max(np.linalg.norm(light), 1e-6)
+    shade = np.clip(normals @ light, 0.0, 1.0)
+    shade = 0.5 + shade * 0.5
+
+    base = np.column_stack(
+        [
+            0.07 + bg_map * 0.14,
+            0.095 + bg_map * 0.16,
+            0.12 + bg_map * 0.19,
+        ]
+    )
+    base *= shade[:, None]
+
+    cyan = np.asarray([0.23, 0.96, 0.92], dtype=float)
+    gold = np.asarray([1.0, 0.76, 0.34], dtype=float)
+    hot_mix = np.clip((display_signal - 0.58) / 0.42, 0.0, 1.0)
+    heat = cyan * (1.0 - hot_mix[:, None]) + gold * hot_mix[:, None]
+
+    alpha = np.clip(display_signal * 0.94, 0.0, 0.94)
+    rgb = base * (1.0 - alpha[:, None]) + heat * alpha[:, None]
+    glow = np.clip(display_signal[:, None] * np.asarray([0.04, 0.1, 0.09]), 0.0, 0.12)
+    rgb = np.clip(rgb + glow, 0.0, 1.0)
+    return np.column_stack([rgb, np.ones(len(rgb))])
+
+
+def _poster_display_signal(signal: np.ndarray) -> np.ndarray:
+    if signal.size == 0 or float(np.max(signal)) <= 0:
+        return np.zeros_like(signal)
+
+    low = float(np.percentile(signal, 48))
+    high = float(np.percentile(signal, 99.2))
+    if high <= low:
+        high = float(np.max(signal))
+        low = 0.0
+    scaled = np.clip((signal - low) / max(high - low, 1e-6), 0.0, 1.0)
+    return np.power(scaled, 0.72)
+
+
+def _face_normals(coords: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    triangles = coords[faces]
+    normals = np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0])
+    lengths = np.linalg.norm(normals, axis=1, keepdims=True)
+    return normals / np.maximum(lengths, 1e-6)
+
+
+def _set_equal_3d_limits(ax: Any, coords: np.ndarray) -> None:
+    mins = coords.min(axis=0)
+    maxs = coords.max(axis=0)
+    center = (mins + maxs) / 2.0
+    ranges = maxs - mins
+    depth_radius = float(ranges[0]) * 0.48
+    visible_radius = float(max(ranges[1], ranges[2])) * 0.52
+    ax.set_xlim(center[0] - depth_radius, center[0] + depth_radius)
+    ax.set_ylim(center[1] - visible_radius, center[1] + visible_radius)
+    ax.set_zlim(center[2] - visible_radius, center[2] + visible_radius)
+    ax.set_box_aspect((1, 1, 0.78))
+
+
 def _format_ts(seconds: float) -> str:
     total = int(round(seconds))
     minutes, secs = divmod(total, 60)
@@ -224,6 +376,8 @@ def _format_ts(seconds: float) -> str:
 
 @lru_cache(maxsize=1)
 def _load_mesh_bundle(mesh_level: str) -> dict[str, Any]:
+    from tribev2.plotting.cortical import PlotBrainNilearn
+
     normal_plotter = PlotBrainNilearn(mesh=mesh_level, inflate=False, bg_map="sulcal")
     inflated_plotter = PlotBrainNilearn(mesh=mesh_level, inflate="half", bg_map="sulcal")
 

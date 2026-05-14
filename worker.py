@@ -5,7 +5,6 @@ import math
 import os
 import shutil
 import time
-from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -15,7 +14,7 @@ from fastapi import FastAPI, Request as FastAPIRequest
 from fastapi.responses import JSONResponse
 from google.cloud import storage
 
-from brain_visualization import REGION_DEFINITIONS, build_brain_simulation
+from brain_visualization import REGION_DEFINITIONS, build_brain_simulation, render_surface_poster
 from official_report import generate_official_report
 from tribe_runtime import TribeVideoBackend
 
@@ -112,7 +111,8 @@ def _run_scan(payload: Any) -> dict[str, Any]:
         timings["report"] = _elapsed(phase)
 
         phase = time.perf_counter()
-        brain_timeline = _build_brain_timeline(run)
+        brain_simulation = build_brain_simulation(run.preds, run.timestamps)
+        brain_timeline = _build_brain_timeline(brain_simulation)
         timings["timeline"] = _elapsed(phase)
 
         brain_timeline_path = f"{output_prefix}/{BRAIN_TIMELINE_JSON_NAME}"
@@ -124,7 +124,12 @@ def _run_scan(payload: Any) -> dict[str, Any]:
         timings["uploadTimeline"] = _elapsed(phase)
 
         phase = time.perf_counter()
-        _upload_bytes(brain_poster_path, _render_brain_poster(brain_timeline), "image/png")
+        peak_time = _read_number(report, ["predictions", "peak_time_seconds"], None)
+        _upload_bytes(
+            brain_poster_path,
+            render_surface_poster(brain_simulation, peak_time),
+            "image/png",
+        )
         timings["renderAndUploadPoster"] = _elapsed(phase)
 
         phase = time.perf_counter()
@@ -218,8 +223,7 @@ def _build_summary(
     return summary
 
 
-def _build_brain_timeline(run: Any) -> dict[str, Any]:
-    simulation = build_brain_simulation(run.preds, run.timestamps)
+def _build_brain_timeline(simulation: dict[str, Any]) -> dict[str, Any]:
     frames = simulation.get("frames")
     if not isinstance(frames, list) or not frames:
         raise RuntimeError("TRIBE brain simulation produced no frames.")
@@ -251,47 +255,6 @@ def _build_brain_timeline(run: Any) -> dict[str, Any]:
         "timestamps": timestamps,
         "regions": regions,
     }
-
-
-def _render_brain_poster(timeline: dict[str, Any]) -> bytes:
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    timestamps = timeline["timestamps"]
-    regions = timeline["regions"]
-
-    fig, ax = plt.subplots(figsize=(6.4, 3.6), dpi=160)
-    fig.patch.set_facecolor("#06131f")
-    ax.set_facecolor("#06131f")
-
-    for region in REGION_DEFINITIONS:
-        values = regions[region["key"]]
-        ax.plot(
-            timestamps,
-            values,
-            color=region["color"],
-            linewidth=2.0,
-            alpha=0.86,
-            label=region["label_en"],
-        )
-
-    ax.set_ylim(0, 1)
-    ax.set_xlim(0, max(timestamps[-1], 0.001))
-    ax.grid(color="#244255", linewidth=0.6, alpha=0.35)
-    ax.tick_params(colors="#8bb8c7", labelsize=7)
-    for spine in ax.spines.values():
-        spine.set_color("#2a4d60")
-    ax.set_title("TRIBE attention timeline", color="#e6fbff", fontsize=11, pad=10)
-    ax.legend(loc="upper right", fontsize=6, frameon=False, labelcolor="#d7eef5")
-    fig.tight_layout(pad=1.0)
-
-    buffer = BytesIO()
-    fig.savefig(buffer, format="png", facecolor=fig.get_facecolor())
-    plt.close(fig)
-    return buffer.getvalue()
-
 
 def _read_number(report: dict[str, Any], path: list[str], fallback: float | None) -> float | None:
     current: Any = report
