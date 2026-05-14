@@ -19,7 +19,7 @@ import tribev2.eventstransforms as tribev2_eventstransforms
 from runtime_setup import ensure_local_ffmpeg_on_path
 
 
-if hasattr(pathlib, "WindowsPath"):
+if os.name == "nt" and hasattr(pathlib, "WindowsPath"):
     pathlib.PosixPath = pathlib.WindowsPath  # type: ignore[assignment]
 
 from tribev2 import TribeModel
@@ -136,6 +136,22 @@ class TribeVideoBackend:
 
     @staticmethod
     def _ensure_official_transcript_helper() -> None:
+        if not ENABLE_TEXT_EVENTS:
+            current = tribev2_eventstransforms.ExtractWordsFromAudio._get_transcript_from_audio
+            if getattr(current, "__name__", "") == "_skip_get_transcript_from_audio":
+                return
+
+            def _skip_get_transcript_from_audio(
+                _wav_filename: Path,
+                _language: str,
+            ) -> pd.DataFrame:
+                return _empty_transcript_dataframe()
+
+            tribev2_eventstransforms.ExtractWordsFromAudio._get_transcript_from_audio = staticmethod(
+                _skip_get_transcript_from_audio
+            )
+            return
+
         current = tribev2_eventstransforms.ExtractWordsFromAudio._get_transcript_from_audio
         if getattr(current, "__name__", "") == "_compatible_get_transcript_from_audio":
             return

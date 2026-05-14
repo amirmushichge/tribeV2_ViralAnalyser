@@ -4,6 +4,7 @@ import json
 import math
 import os
 import shutil
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -13,6 +14,7 @@ from fastapi import FastAPI, Request as FastAPIRequest
 from fastapi.responses import JSONResponse
 from google.cloud import storage
 
+from brain_visualization import REGION_DEFINITIONS, build_brain_simulation
 from official_report import generate_official_report
 from tribe_runtime import TribeVideoBackend
 
@@ -23,6 +25,8 @@ backend = TribeVideoBackend()
 MAX_HEADLINE_LENGTH = 240
 DOWNLOAD_TIMEOUT_SECONDS = 300
 REPORT_JSON_NAME = "report.json"
+BRAIN_TIMELINE_JSON_NAME = "brain.json"
+BRAIN_POSTER_NAME = "brain-poster.png"
 
 
 class RequestError(ValueError):
@@ -73,10 +77,15 @@ def _run_scan(payload: Any) -> dict[str, Any]:
 
         run = backend.predict_video(video_path)
         report = generate_official_report(video_path, run, variant_name=variant_name)
+        brain_timeline = _build_brain_timeline(run)
+        brain_timeline_path = f"{output_prefix}/{BRAIN_TIMELINE_JSON_NAME}"
+        brain_poster_path = f"{output_prefix}/{BRAIN_POSTER_NAME}"
         raw_report_path = f"{output_prefix}/{REPORT_JSON_NAME}"
-        _upload_report(raw_report_path, report)
+        _upload_json(brain_timeline_path, brain_timeline)
+        _upload_bytes(brain_poster_path, _render_brain_poster(brain_timeline), "image/png")
+        _upload_json(raw_report_path, report)
 
-    summary = _build_summary(report)
+    summary = _build_summary(report, brain_timeline_path, brain_poster_path)
     return {
         "status": "completed",
         "summary": summary,
@@ -105,12 +114,20 @@ def _download(input_url: str, video_path: Path) -> None:
             shutil.copyfileobj(response, output)
 
 
-def _upload_report(raw_report_path: str, report: dict[str, Any]) -> None:
+def _upload_json(path: str, payload: dict[str, Any]) -> None:
     bucket_name = _bucket_name()
-    body = json.dumps(report, ensure_ascii=False, separators=(",", ":"))
-    storage.Client().bucket(bucket_name).blob(raw_report_path).upload_from_string(
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    storage.Client().bucket(bucket_name).blob(path).upload_from_string(
         body,
         content_type="application/json",
+    )
+
+
+def _upload_bytes(path: str, payload: bytes, content_type: str) -> None:
+    bucket_name = _bucket_name()
+    storage.Client().bucket(bucket_name).blob(path).upload_from_string(
+        payload,
+        content_type=content_type,
     )
 
 
@@ -122,20 +139,102 @@ def _bucket_name() -> str:
     raise WorkerConfigError("Set FIREBASE_STORAGE_BUCKET or GCS_BUCKET.")
 
 
-def _build_summary(report: dict[str, Any]) -> dict[str, Any]:
-    score = _clamp_score(_read_number(report, ["timeline", "avg_score"], 50.0))
+def _build_summary(
+    report: dict[str, Any],
+    brain_timeline_path: str,
+    brain_poster_path: str,
+) -> dict[str, Any]:
+    score = _clamp_score(_read_number(report, ["timeline", "avg_score"], None))
     peak_time = _read_number(report, ["predictions", "peak_time_seconds"], None)
     headline = _headline(report)
 
     summary: dict[str, Any] = {
-        "band": _band(score),
-        "score": score,
+        "band": _band(score) if score is not None else "mixed",
+        "brainTimelinePath": brain_timeline_path,
+        "brainPosterPath": brain_poster_path,
     }
+    if score is not None:
+        summary["score"] = score
     if peak_time is not None and math.isfinite(peak_time) and peak_time >= 0:
         summary["peakTimeSeconds"] = round(float(peak_time), 2)
     if headline:
         summary["headline"] = headline[:MAX_HEADLINE_LENGTH]
     return summary
+
+
+def _build_brain_timeline(run: Any) -> dict[str, Any]:
+    simulation = build_brain_simulation(run.preds, run.timestamps)
+    frames = simulation.get("frames")
+    if not isinstance(frames, list) or not frames:
+        raise RuntimeError("TRIBE brain simulation produced no frames.")
+
+    timestamps: list[float] = []
+    regions: dict[str, list[float]] = {region["key"]: [] for region in REGION_DEFINITIONS}
+
+    for frame in frames:
+        if not isinstance(frame, dict):
+            raise RuntimeError("TRIBE brain simulation frame is invalid.")
+
+        raw_second = frame.get("seconds")
+        second = float(raw_second) if isinstance(raw_second, (int, float)) else 0.0
+        if timestamps and second <= timestamps[-1]:
+            second = timestamps[-1] + 0.001
+        timestamps.append(round(second, 3))
+
+        region_scores = frame.get("region_scores")
+        if not isinstance(region_scores, list):
+            raise RuntimeError("TRIBE brain simulation frame is missing region scores.")
+
+        for index, region in enumerate(REGION_DEFINITIONS):
+            score = region_scores[index] if index < len(region_scores) else 0.0
+            regions[region["key"]].append(_clamp_unit(score))
+
+    return {
+        "version": 1,
+        "durationSeconds": max(timestamps[-1], 0.001),
+        "timestamps": timestamps,
+        "regions": regions,
+    }
+
+
+def _render_brain_poster(timeline: dict[str, Any]) -> bytes:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    timestamps = timeline["timestamps"]
+    regions = timeline["regions"]
+
+    fig, ax = plt.subplots(figsize=(6.4, 3.6), dpi=160)
+    fig.patch.set_facecolor("#06131f")
+    ax.set_facecolor("#06131f")
+
+    for region in REGION_DEFINITIONS:
+        values = regions[region["key"]]
+        ax.plot(
+            timestamps,
+            values,
+            color=region["color"],
+            linewidth=2.0,
+            alpha=0.86,
+            label=region["label_en"],
+        )
+
+    ax.set_ylim(0, 1)
+    ax.set_xlim(0, max(timestamps[-1], 0.001))
+    ax.grid(color="#244255", linewidth=0.6, alpha=0.35)
+    ax.tick_params(colors="#8bb8c7", labelsize=7)
+    for spine in ax.spines.values():
+        spine.set_color("#2a4d60")
+    ax.set_title("TRIBE attention timeline", color="#e6fbff", fontsize=11, pad=10)
+    ax.legend(loc="upper right", fontsize=6, frameon=False, labelcolor="#d7eef5")
+    fig.tight_layout(pad=1.0)
+
+    buffer = BytesIO()
+    fig.savefig(buffer, format="png", facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return buffer.getvalue()
 
 
 def _read_number(report: dict[str, Any], path: list[str], fallback: float | None) -> float | None:
@@ -149,10 +248,20 @@ def _read_number(report: dict[str, Any], path: list[str], fallback: float | None
     return fallback
 
 
-def _clamp_score(value: float | None) -> float:
+def _clamp_score(value: float | None) -> float | None:
     if value is None or not math.isfinite(value):
-        value = 50.0
+        return None
     return round(max(0.0, min(100.0, float(value))), 1)
+
+
+def _clamp_unit(value: Any) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(number):
+        return 0.0
+    return round(max(0.0, min(1.0, number)), 4)
 
 
 def _band(score: float) -> str:
