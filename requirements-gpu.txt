@@ -4,9 +4,6 @@ python-multipart
 jinja2
 numpy
 pandas
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.6.0+cpu
-torchvision==0.21.0+cpu
 matplotlib
 moviepy
 huggingface-hub
