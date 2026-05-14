@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-multipart
+jinja2
+numpy
+pandas
+matplotlib
+moviepy
+huggingface-hub
+google-cloud-storage
+openai-whisper
+imageio-ffmpeg
+uv
+tribev2[plotting] @ https://github.com/facebookresearch/tribev2/archive/72399081ed3f1040c4d996cefb2864a4c46f5b8e.zip

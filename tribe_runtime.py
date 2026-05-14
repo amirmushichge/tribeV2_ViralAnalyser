@@ -8,6 +8,7 @@ import subprocess
 import shutil
 import threading
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,19 @@ ENABLE_TEXT_EVENTS = os.environ.get("TRIBE_ENABLE_TEXT_EVENTS", "").strip().lowe
     "true",
     "yes",
 }
+REQUIRE_CUDA = os.environ.get("TRIBE_REQUIRE_CUDA", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
+FORCE_CPU_EVENT_EXTRACTION = os.environ.get(
+    "TRIBE_FORCE_CPU_EVENT_EXTRACTION",
+    "",
+).strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 
 @dataclass
@@ -60,10 +74,37 @@ class TribeVideoBackend:
     def device(self) -> str:
         return _select_torch_device()
 
+    @property
+    def ready(self) -> bool:
+        return self._model is not None
+
+    def runtime_info(self) -> dict[str, Any]:
+        cuda_available = torch.cuda.is_available()
+        gpu_name = None
+        if cuda_available:
+            try:
+                gpu_name = torch.cuda.get_device_name(0)
+            except Exception:
+                gpu_name = None
+        return {
+            "device": self.device,
+            "ready": self.ready,
+            "requireCuda": REQUIRE_CUDA,
+            "forceCpuEventExtraction": FORCE_CPU_EVENT_EXTRACTION,
+            "torchVersion": torch.__version__,
+            "torchCudaVersion": torch.version.cuda,
+            "torchCudaAvailable": cuda_available,
+            "gpuName": gpu_name,
+            "cacheDir": str(CACHE_DIR),
+            "modelSnapshotDir": str(MODEL_SNAPSHOT_DIR),
+        }
+
     def load(self) -> TribeModel:
         with self._lock:
             if self._model is None:
                 device = self.device
+                if REQUIRE_CUDA and device != "cuda":
+                    raise RuntimeError("TRIBE_REQUIRE_CUDA is set, but CUDA is not available.")
                 model_dir = self._resolve_official_model_dir(device)
                 self._model = TribeModel.from_pretrained(
                     model_dir,
@@ -93,26 +134,58 @@ class TribeVideoBackend:
         model = self.load()
         self._ensure_uvx_on_path()
         self._ensure_official_transcript_helper()
-        original_cuda_check = tribev2_eventstransforms.torch.cuda.is_available
-        tribev2_eventstransforms.torch.cuda.is_available = lambda: False
-        try:
-            events = model.get_events_dataframe(video_path=str(Path(video_path)))
-        finally:
-            tribev2_eventstransforms.torch.cuda.is_available = original_cuda_check
+        device = self.device
+        if REQUIRE_CUDA and device != "cuda":
+            raise RuntimeError("TRIBE_REQUIRE_CUDA is set, but CUDA is not available.")
+        events = self._get_events_dataframe(model, video_path, device)
         events = _drop_text_events_unless_enabled(events)
-        preds, segments = model.predict(events=events, verbose=False)
+        if device == "cuda":
+            torch.cuda.synchronize()
+        predict_start = time.perf_counter()
+        with torch.inference_mode():
+            preds, segments = model.predict(events=events, verbose=False)
+        if device == "cuda":
+            torch.cuda.synchronize()
+        print(
+            json.dumps(
+                {
+                    "event": "tribe_predict_completed",
+                    "device": device,
+                    "elapsedSeconds": round(time.perf_counter() - predict_start, 3),
+                },
+                separators=(",", ":"),
+            ),
+            flush=True,
+        )
         timestamps = [self._segment_timestamp(segment) for segment in segments]
         modalities = sorted({str(item).lower() for item in events["type"].unique().tolist()})
         return TribeRunResult(
             preds=preds,
             timestamps=timestamps,
-            device=self.device,
+            device=device,
             modalities=modalities,
             events_count=len(events),
             mesh_level="fsaverage5",
             subject_model="average",
             hemodynamic_lag_seconds=5.0,
         )
+
+    def _get_events_dataframe(
+        self,
+        model: TribeModel,
+        video_path: str | Path,
+        device: str,
+    ) -> pd.DataFrame:
+        should_force_cpu = device != "cuda" or FORCE_CPU_EVENT_EXTRACTION
+        if not should_force_cpu:
+            return model.get_events_dataframe(video_path=str(Path(video_path)))
+
+        original_cuda_check = tribev2_eventstransforms.torch.cuda.is_available
+        tribev2_eventstransforms.torch.cuda.is_available = lambda: False
+        try:
+            return model.get_events_dataframe(video_path=str(Path(video_path)))
+        finally:
+            tribev2_eventstransforms.torch.cuda.is_available = original_cuda_check
 
     @staticmethod
     def _segment_timestamp(segment: Any) -> float:

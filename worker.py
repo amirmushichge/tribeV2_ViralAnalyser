@@ -4,6 +4,7 @@ import json
 import math
 import os
 import shutil
+import time
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -37,6 +38,29 @@ class WorkerConfigError(RuntimeError):
     pass
 
 
+@app.on_event("startup")
+async def preload_model_if_configured() -> None:
+    if _env_flag("TRIBE_REQUIRE_CUDA") or _env_flag("TRIBE_PRELOAD_MODEL"):
+        backend.load()
+    _log_event("tribe_worker_ready", backend.runtime_info())
+
+
+@app.get("/healthz")
+async def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+async def readyz() -> JSONResponse:
+    info = backend.runtime_info()
+    require_cuda = bool(info["requireCuda"])
+    if require_cuda and info["device"] != "cuda":
+        return JSONResponse({"status": "not_ready", **info}, status_code=503)
+    if _env_flag("TRIBE_PRELOAD_MODEL") and not info["ready"]:
+        return JSONResponse({"status": "not_ready", **info}, status_code=503)
+    return JSONResponse({"status": "ready", **info})
+
+
 @app.post("/scan")
 async def scan_video(request: FastAPIRequest) -> JSONResponse:
     try:
@@ -57,6 +81,8 @@ async def scan_video(request: FastAPIRequest) -> JSONResponse:
 
 
 def _run_scan(payload: Any) -> dict[str, Any]:
+    started = time.perf_counter()
+    timings: dict[str, float] = {}
     if not isinstance(payload, dict):
         raise RequestError("Request body must be an object.")
 
@@ -73,19 +99,49 @@ def _run_scan(payload: Any) -> dict[str, Any]:
 
     with TemporaryDirectory(prefix=f"tribe-{scan_id}-") as tmp_dir:
         video_path = Path(tmp_dir) / "input.mp4"
+        phase = time.perf_counter()
         _download(input_url, video_path)
+        timings["download"] = _elapsed(phase)
 
+        phase = time.perf_counter()
         run = backend.predict_video(video_path)
+        timings["predict"] = _elapsed(phase)
+
+        phase = time.perf_counter()
         report = generate_official_report(video_path, run, variant_name=variant_name)
+        timings["report"] = _elapsed(phase)
+
+        phase = time.perf_counter()
         brain_timeline = _build_brain_timeline(run)
+        timings["timeline"] = _elapsed(phase)
+
         brain_timeline_path = f"{output_prefix}/{BRAIN_TIMELINE_JSON_NAME}"
         brain_poster_path = f"{output_prefix}/{BRAIN_POSTER_NAME}"
         raw_report_path = f"{output_prefix}/{REPORT_JSON_NAME}"
+
+        phase = time.perf_counter()
         _upload_json(brain_timeline_path, brain_timeline)
+        timings["uploadTimeline"] = _elapsed(phase)
+
+        phase = time.perf_counter()
         _upload_bytes(brain_poster_path, _render_brain_poster(brain_timeline), "image/png")
+        timings["renderAndUploadPoster"] = _elapsed(phase)
+
+        phase = time.perf_counter()
         _upload_json(raw_report_path, report)
+        timings["uploadReport"] = _elapsed(phase)
 
     summary = _build_summary(report, brain_timeline_path, brain_poster_path)
+    _log_event(
+        "tribe_scan_completed",
+        {
+            "scanId": scan_id,
+            "partnerId": partner_id,
+            "device": run.device,
+            "durationSeconds": round(time.perf_counter() - started, 3),
+            "timings": timings,
+        },
+    )
     return {
         "status": "completed",
         "summary": summary,
@@ -295,3 +351,15 @@ def _failed(code: str, message: str, retryable: bool, status_code: int) -> JSONR
         },
         status_code=status_code,
     )
+
+
+def _env_flag(key: str) -> bool:
+    return os.environ.get(key, "").strip().lower() in {"1", "true", "yes"}
+
+
+def _elapsed(started: float) -> float:
+    return round(time.perf_counter() - started, 3)
+
+
+def _log_event(event: str, payload: dict[str, Any]) -> None:
+    print(json.dumps({"event": event, **payload}, separators=(",", ":")), flush=True)
