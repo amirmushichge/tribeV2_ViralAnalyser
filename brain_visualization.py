@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from io import BytesIO
 from functools import lru_cache
 from math import ceil
 from typing import Any
 
 import numpy as np
-from tribev2.plotting.cortical import PlotBrainNilearn
 
 
 BRAIN_MESH_LEVEL = "fsaverage5"
@@ -13,6 +13,9 @@ MIN_BRAIN_FRAMES = 24
 MAX_BRAIN_FRAMES = 40
 TARGET_BRAIN_FPS = 1.45
 SIGNAL_QUANTIZATION = 255
+POSTER_DPI = 180
+POSTER_SIZE_INCHES = (6.4, 4.0)
+POSTER_BACKGROUND_RGB = (5, 7, 11)
 
 REGION_DEFINITIONS = (
     {
@@ -144,6 +147,63 @@ def build_brain_simulation(
     }
 
 
+def render_surface_poster(simulation: dict[str, Any], peak_time_seconds: float | None = None) -> bytes:
+    mesh = simulation.get("mesh")
+    frames = simulation.get("frames")
+    if not isinstance(mesh, dict) or not isinstance(frames, list) or not frames:
+        raise RuntimeError("TRIBE brain simulation is missing mesh frames.")
+
+    coords = _surface_coords(mesh, "inflated")
+    faces = np.asarray(mesh.get("faces"), dtype=int).reshape(-1, 3)
+    bg_map = np.asarray(mesh.get("bg_map"), dtype=float) / SIGNAL_QUANTIZATION
+    frame = _poster_frame(frames, peak_time_seconds)
+    signal = np.asarray(frame.get("signal"), dtype=float) / SIGNAL_QUANTIZATION
+
+    if coords.ndim != 2 or coords.shape[1] != 3:
+        raise RuntimeError("TRIBE brain simulation surface coordinates are invalid.")
+    if faces.ndim != 2 or faces.shape[1] != 3:
+        raise RuntimeError("TRIBE brain simulation faces are invalid.")
+    if len(bg_map) != len(coords) or len(signal) != len(coords):
+        raise RuntimeError("TRIBE brain simulation vertex arrays do not match the surface.")
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
+    face_signal = np.mean(signal[faces], axis=1)
+    face_bg = np.mean(bg_map[faces], axis=1)
+    face_colors = _poster_face_colors(coords, faces, face_bg, face_signal)
+
+    fig = plt.figure(figsize=POSTER_SIZE_INCHES, dpi=POSTER_DPI)
+    fig.patch.set_facecolor("#05070b")
+    ax = fig.add_subplot(111, projection="3d")
+    ax.set_facecolor("#05070b")
+    ax.set_axis_off()
+    ax.set_proj_type("persp", focal_length=0.52)
+
+    triangles = coords[faces]
+    surface = Poly3DCollection(
+        triangles,
+        facecolors=face_colors,
+        edgecolors=(1, 1, 1, 0.018),
+        linewidths=0.08,
+        antialiased=False,
+    )
+    surface.set_zsort("average")
+    ax.add_collection3d(surface)
+
+    _set_equal_3d_limits(ax, coords)
+    ax.view_init(elev=8, azim=268, roll=-1)
+    fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+
+    buffer = BytesIO()
+    fig.savefig(buffer, format="png", facecolor=fig.get_facecolor(), pad_inches=0)
+    plt.close(fig)
+    return _polish_surface_poster(buffer.getvalue())
+
+
 def _build_time_axis(total_frames: int, timestamps: list[float]) -> np.ndarray:
     if timestamps and len(timestamps) == total_frames:
         out = np.asarray(timestamps, dtype=float)
@@ -216,6 +276,259 @@ def _compute_region_scores(signal: np.ndarray, region_masks: list[np.ndarray]) -
     return scores, peak_scores
 
 
+def _surface_coords(mesh: dict[str, Any], surface_name: str) -> np.ndarray:
+    surfaces = mesh.get("surfaces")
+    if not isinstance(surfaces, dict):
+        raise RuntimeError("TRIBE brain simulation is missing surfaces.")
+
+    raw = surfaces.get(surface_name) or surfaces.get(mesh.get("default_surface")) or surfaces.get("normal")
+    if raw is None:
+        raise RuntimeError("TRIBE brain simulation is missing surface coordinates.")
+    return np.asarray(raw, dtype=float).reshape(-1, 3)
+
+
+def _poster_frame(frames: list[dict[str, Any]], peak_time_seconds: float | None) -> dict[str, Any]:
+    if peak_time_seconds is not None:
+        return min(
+            frames,
+            key=lambda frame: abs(float(frame.get("seconds", 0.0)) - peak_time_seconds),
+        )
+
+    return max(
+        frames,
+        key=lambda frame: float(np.mean(np.asarray(frame.get("signal", []), dtype=float)))
+        if frame.get("signal")
+        else 0.0,
+    )
+
+
+def _poster_face_colors(
+    coords: np.ndarray,
+    faces: np.ndarray,
+    bg_map: np.ndarray,
+    signal: np.ndarray,
+) -> np.ndarray:
+    display_signal = _poster_display_signal(signal)
+    normals = _face_normals(coords, faces)
+    light = np.asarray([-0.2, -0.66, 0.72], dtype=float)
+    light /= max(np.linalg.norm(light), 1e-6)
+    shade = np.clip(normals @ light, 0.0, 1.0)
+    shade = 0.56 + shade * 0.54
+
+    base = np.column_stack(
+        [
+            0.082 + bg_map * 0.15,
+            0.12 + bg_map * 0.2,
+            0.15 + bg_map * 0.24,
+        ]
+    )
+    base *= shade[:, None]
+
+    cyan = np.asarray([0.18, 1.0, 0.94], dtype=float)
+    gold = np.asarray([1.0, 0.8, 0.26], dtype=float)
+    hot_mix = np.clip((display_signal - 0.5) / 0.5, 0.0, 1.0)
+    heat = cyan * (1.0 - hot_mix[:, None]) + gold * hot_mix[:, None]
+
+    alpha = np.clip(display_signal * 1.08, 0.0, 0.97)
+    rgb = base * (1.0 - alpha[:, None]) + heat * alpha[:, None]
+    glow = np.clip(display_signal[:, None] * np.asarray([0.08, 0.17, 0.15]), 0.0, 0.18)
+    rgb = np.clip(rgb + glow, 0.0, 1.0)
+    return np.column_stack([rgb, np.ones(len(rgb))])
+
+
+def _poster_display_signal(signal: np.ndarray) -> np.ndarray:
+    if signal.size == 0 or float(np.max(signal)) <= 0:
+        return np.zeros_like(signal)
+
+    low = float(np.percentile(signal, 42))
+    high = float(np.percentile(signal, 99.0))
+    if high <= low:
+        high = float(np.max(signal))
+        low = 0.0
+    scaled = np.clip((signal - low) / max(high - low, 1e-6), 0.0, 1.0)
+    return np.power(scaled, 0.64)
+
+
+def _polish_surface_poster(raw_png: bytes) -> bytes:
+    from PIL import Image, ImageEnhance, ImageFilter
+
+    raw = Image.open(BytesIO(raw_png)).convert("RGBA")
+    canvas_w, canvas_h = raw.size
+    surface_box = _surface_content_box(raw)
+    if surface_box is None:
+        return raw_png
+
+    cropped = raw.crop(surface_box)
+    cropped = _transparent_background(cropped)
+    cropped = _trim_transparent_edge(cropped)
+    cropped = ImageEnhance.Contrast(cropped).enhance(1.18)
+    cropped = ImageEnhance.Color(cropped).enhance(1.18)
+    cropped = ImageEnhance.Brightness(cropped).enhance(1.08)
+
+    target_w = int(canvas_w * 0.9)
+    target_h = int(canvas_h * 0.5)
+    scale = min(target_w / cropped.width, target_h / cropped.height)
+    scaled_size = (max(1, int(cropped.width * scale)), max(1, int(cropped.height * scale)))
+    resample = getattr(Image, "Resampling", Image).LANCZOS
+    hero = cropped.resize(scaled_size, resample)
+
+    background = _poster_background((canvas_w, canvas_h))
+    x = (canvas_w - hero.width) // 2
+    y = int(canvas_h * 0.18)
+
+    glow = _activation_glow(hero, (canvas_w, canvas_h), (x, y))
+    background.alpha_composite(glow)
+    background.alpha_composite(hero, (x, y))
+    background.alpha_composite(_rim_light(hero, (canvas_w, canvas_h), (x, y)))
+    background = _apply_poster_vignette(background)
+
+    output = BytesIO()
+    background.save(output, format="PNG", optimize=True)
+    return output.getvalue()
+
+
+def _surface_content_box(image: Any) -> tuple[int, int, int, int] | None:
+    pixels = np.asarray(image.convert("RGB"), dtype=float)
+    background = np.asarray(POSTER_BACKGROUND_RGB, dtype=float)
+    distance = np.linalg.norm(pixels - background, axis=2)
+    luminance = pixels @ np.asarray([0.2126, 0.7152, 0.0722], dtype=float)
+    mask = (distance > 10.0) | (luminance > 30.0)
+    if not bool(mask.any()):
+        return None
+
+    ys, xs = np.where(mask)
+    pad_x = max(10, int(image.width * 0.025))
+    pad_y = max(10, int(image.height * 0.035))
+    left = max(0, int(xs.min()) - pad_x)
+    right = min(image.width, int(xs.max()) + pad_x)
+    top = max(0, int(ys.min()) - pad_y)
+    bottom = min(image.height, int(ys.max()) + pad_y)
+    return left, top, right, bottom
+
+
+def _trim_transparent_edge(image: Any) -> Any:
+    alpha = image.getchannel("A")
+    box = alpha.getbbox()
+    return image.crop(box) if box else image
+
+
+def _transparent_background(image: Any) -> Any:
+    pixels = np.array(image.convert("RGBA"), dtype=np.uint8)
+    rgb = pixels[..., :3].astype(float)
+    background = np.asarray(POSTER_BACKGROUND_RGB, dtype=float)
+    distance = np.linalg.norm(rgb - background, axis=2)
+    luminance = rgb @ np.asarray([0.2126, 0.7152, 0.0722], dtype=float)
+    keep = (distance > 9.0) | (luminance > 28.0)
+    pixels[..., 3] = np.where(keep, pixels[..., 3], 0).astype(np.uint8)
+    from PIL import Image
+
+    return Image.fromarray(pixels, mode="RGBA")
+
+
+def _poster_background(size: tuple[int, int]) -> Any:
+    from PIL import Image
+
+    width, height = size
+    y, x = np.ogrid[0:height, 0:width]
+    center_x = width * 0.5
+    center_y = height * 0.42
+    distance = np.sqrt(((x - center_x) / width) ** 2 + ((y - center_y) / height) ** 2)
+    aura = np.clip(1.0 - distance / 0.58, 0.0, 1.0) ** 2.2
+    vertical = np.clip(1.0 - y / height, 0.0, 1.0)
+
+    base = np.zeros((height, width, 4), dtype=np.uint8)
+    base[..., 0] = np.clip(POSTER_BACKGROUND_RGB[0] + aura * 7 + vertical * 3, 0, 255)
+    base[..., 1] = np.clip(POSTER_BACKGROUND_RGB[1] + aura * 18 + vertical * 5, 0, 255)
+    base[..., 2] = np.clip(POSTER_BACKGROUND_RGB[2] + aura * 21 + vertical * 7, 0, 255)
+    base[..., 3] = 255
+
+    grid_x = (np.mod(x, 56) == 0)
+    grid_y = (np.mod(y, 56) == 0)
+    grid = grid_x | grid_y
+    base[grid, 1] = np.clip(base[grid, 1] + 7, 0, 255)
+    base[grid, 2] = np.clip(base[grid, 2] + 9, 0, 255)
+    base[grid, 3] = 255
+    return Image.fromarray(base, mode="RGBA")
+
+
+def _activation_glow(hero: Any, canvas_size: tuple[int, int], offset: tuple[int, int]) -> Any:
+    from PIL import Image, ImageFilter
+
+    canvas = Image.new("RGBA", canvas_size, (0, 0, 0, 0))
+    pixels = np.asarray(hero.convert("RGBA"), dtype=np.uint8)
+    rgb = pixels[..., :3].astype(int)
+    alpha = pixels[..., 3]
+    luminance = rgb[..., 0] * 0.2126 + rgb[..., 1] * 0.7152 + rgb[..., 2] * 0.0722
+    chroma = rgb.max(axis=2) - rgb.min(axis=2)
+    hot = (
+        (alpha > 40)
+        & (luminance > 72)
+        & (chroma > 26)
+        & (((rgb[..., 1] > 132) & (rgb[..., 2] > 105)) | ((rgb[..., 0] > 158) & (rgb[..., 1] > 118)))
+    )
+    if not bool(hot.any()):
+        return canvas
+
+    mask = Image.fromarray((hot.astype(np.uint8) * 255), mode="L")
+    mask = mask.filter(ImageFilter.GaussianBlur(radius=10))
+    color = Image.new("RGBA", hero.size, (28, 255, 226, 80))
+    gold = Image.new("RGBA", hero.size, (255, 190, 54, 44))
+    glow = Image.new("RGBA", hero.size, (0, 0, 0, 0))
+    glow.alpha_composite(color)
+    glow.alpha_composite(gold)
+    glow.putalpha(mask)
+    glow = glow.filter(ImageFilter.GaussianBlur(radius=6))
+    canvas.alpha_composite(glow, offset)
+    return canvas
+
+
+def _rim_light(hero: Any, canvas_size: tuple[int, int], offset: tuple[int, int]) -> Any:
+    from PIL import Image, ImageChops, ImageFilter
+
+    alpha = hero.getchannel("A")
+    outer = alpha.filter(ImageFilter.MaxFilter(size=9))
+    rim_mask = ImageChops.subtract(outer, alpha).filter(ImageFilter.GaussianBlur(radius=3))
+    rim = Image.new("RGBA", hero.size, (92, 255, 239, 18))
+    rim.putalpha(rim_mask)
+    canvas = Image.new("RGBA", canvas_size, (0, 0, 0, 0))
+    canvas.alpha_composite(rim, offset)
+    return canvas
+
+
+def _apply_poster_vignette(image: Any) -> Any:
+    from PIL import Image
+
+    width, height = image.size
+    y, x = np.ogrid[0:height, 0:width]
+    dx = (x - width / 2.0) / (width / 2.0)
+    dy = (y - height / 2.0) / (height / 2.0)
+    distance = np.sqrt(dx * dx + dy * dy)
+    vignette = np.clip((distance - 0.18) / 0.88, 0.0, 1.0) ** 1.8
+    pixels = np.asarray(image, dtype=np.float32)
+    pixels[..., :3] *= 1.0 - vignette[..., None] * 0.44
+    return Image.fromarray(np.clip(pixels, 0, 255).astype(np.uint8), mode="RGBA")
+
+
+def _face_normals(coords: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    triangles = coords[faces]
+    normals = np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0])
+    lengths = np.linalg.norm(normals, axis=1, keepdims=True)
+    return normals / np.maximum(lengths, 1e-6)
+
+
+def _set_equal_3d_limits(ax: Any, coords: np.ndarray) -> None:
+    mins = coords.min(axis=0)
+    maxs = coords.max(axis=0)
+    center = (mins + maxs) / 2.0
+    ranges = maxs - mins
+    depth_radius = float(ranges[0]) * 0.48
+    visible_radius = float(max(ranges[1], ranges[2])) * 0.52
+    ax.set_xlim(center[0] - depth_radius, center[0] + depth_radius)
+    ax.set_ylim(center[1] - visible_radius, center[1] + visible_radius)
+    ax.set_zlim(center[2] - visible_radius, center[2] + visible_radius)
+    ax.set_box_aspect((1, 1, 0.78))
+
+
 def _format_ts(seconds: float) -> str:
     total = int(round(seconds))
     minutes, secs = divmod(total, 60)
@@ -224,6 +537,8 @@ def _format_ts(seconds: float) -> str:
 
 @lru_cache(maxsize=1)
 def _load_mesh_bundle(mesh_level: str) -> dict[str, Any]:
+    from tribev2.plotting.cortical import PlotBrainNilearn
+
     normal_plotter = PlotBrainNilearn(mesh=mesh_level, inflate=False, bg_map="sulcal")
     inflated_plotter = PlotBrainNilearn(mesh=mesh_level, inflate="half", bg_map="sulcal")
 
