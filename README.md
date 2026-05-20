@@ -87,11 +87,11 @@ Typical edits:
 - Remove visual clutter.
 - Add a new beat before the graph drops.
 
-Full workflow notes: [docs/WORKFLOWS.md](docs/WORKFLOWS.md)
-
 ### C. Review a website URL
 
-Use website mode for landing pages, hero sections, product pages, and before/after redesign checks.
+Use website mode for landing pages, hero sections, product pages, and before/after redesign checks. Paste a URL, let the app capture the page in a local browser, then inspect the predicted visual attention map by fold and scroll section.
+
+![Website workflow](docs/assets/workflow-website.svg)
 
 Typical use:
 
@@ -99,9 +99,12 @@ Typical use:
 2. Review the desktop and mobile captures.
 3. Toggle between original and heatmap views.
 4. Use fold markers to inspect each scroll section.
-5. Read the layout recommendations and adjust the page.
+5. Check which blocks pull attention and which sections are quiet.
+6. Read the layout recommendations and adjust the page.
 
 For before/after checks, paste a second URL in the optional compare field. The app compares the desktop and mobile attention scores side by side.
+
+Full workflow notes: [docs/WORKFLOWS.md](docs/WORKFLOWS.md)
 
 ## Project structure
 

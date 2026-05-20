@@ -31,3 +31,18 @@ Use this when you only have one cut.
 
 The recommendation cards are hints. The curve is the control surface.
 
+## Workflow C: review a website URL
+
+Use this when you want to check a landing page, hero section, product page, or before/after redesign.
+
+![Website workflow](assets/workflow-website.svg)
+
+1. Paste the website URL.
+2. Let the app capture the page in desktop and mobile view.
+3. Toggle between the original screenshot and the predicted attention heatmap.
+4. Use fold markers to inspect each scroll section.
+5. Check which page blocks pull attention and which sections stay quiet.
+6. If you have a redesign, paste the second URL and compare the before/after scores.
+7. Adjust the hero, CTA, visual hierarchy, or clutter, then capture the page again.
+
+Website review mode is a practical layout check. It does not claim eye-tracking and does not replace real analytics or user testing.

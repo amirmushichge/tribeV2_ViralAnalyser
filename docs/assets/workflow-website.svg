@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Website review workflow</title>
+  <desc id="desc">A website URL is captured in desktop and mobile view, converted into a predicted attention heatmap, split into scroll sections, and compared against an optional second URL.</desc>
+  <defs>
+    <linearGradient id="panel" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#1d211b"/>
+      <stop offset="1" stop-color="#11140f"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#f7f1e7"/>
+      <stop offset="1" stop-color="#d9d2c4"/>
+    </linearGradient>
+    <linearGradient id="heat" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#4aa3ff" stop-opacity="0.55"/>
+      <stop offset="0.42" stop-color="#ffd34d" stop-opacity="0.72"/>
+      <stop offset="0.72" stop-color="#ff653d" stop-opacity="0.82"/>
+      <stop offset="1" stop-color="#d51630" stop-opacity="0.86"/>
+    </linearGradient>
+    <radialGradient id="hotA" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#e90f2e" stop-opacity="0.95"/>
+      <stop offset="0.45" stop-color="#ff7b3a" stop-opacity="0.68"/>
+      <stop offset="0.78" stop-color="#ffe05a" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#ffe05a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="hotB" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#f1ff5e" stop-opacity="0.9"/>
+      <stop offset="0.45" stop-color="#46d7ff" stop-opacity="0.48"/>
+      <stop offset="1" stop-color="#46d7ff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-12%" y="-18%" width="124%" height="136%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#fbf7ee" stroke-opacity="0.08" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1280" height="720" rx="42" fill="#11140f"/>
+  <rect width="1280" height="720" fill="url(#grid)"/>
+
+  <g transform="translate(64 56)">
+    <text x="0" y="0" fill="#f7f1e7" font-family="Manrope, Inter, Arial, sans-serif" font-size="44" font-weight="700">Workflow C: review a website URL</text>
+    <text x="0" y="42" fill="#c9c1b4" font-family="Manrope, Inter, Arial, sans-serif" font-size="20">Paste a landing page URL, capture the page, then inspect predicted attention by screen section.</text>
+  </g>
+
+  <g transform="translate(64 128)" filter="url(#shadow)">
+    <rect x="0" y="0" width="1152" height="526" rx="34" fill="url(#panel)" stroke="#f6f1e7" stroke-opacity="0.12"/>
+
+    <g transform="translate(34 34)">
+      <rect x="0" y="0" width="732" height="50" rx="20" fill="#292d26" stroke="#f6f1e7" stroke-opacity="0.14"/>
+      <text x="24" y="32" fill="#d8d0c4" font-family="Manrope, Inter, Arial, sans-serif" font-size="18">https://your-landing-page.com</text>
+      <rect x="756" y="0" width="180" height="50" rx="20" fill="#f6f1e7"/>
+      <text x="795" y="32" fill="#11140f" font-family="Manrope, Inter, Arial, sans-serif" font-size="17" font-weight="700">Capture URL</text>
+      <rect x="956" y="0" width="134" height="50" rx="20" fill="#292d26" stroke="#f6f1e7" stroke-opacity="0.14"/>
+      <text x="986" y="32" fill="#c9c1b4" font-family="Manrope, Inter, Arial, sans-serif" font-size="16">Compare</text>
+    </g>
+
+    <g transform="translate(34 112)">
+      <rect x="0" y="0" width="594" height="338" rx="24" fill="#292d26" stroke="#f6f1e7" stroke-opacity="0.14"/>
+      <rect x="28" y="28" width="538" height="282" rx="18" fill="url(#screen)"/>
+
+      <rect x="58" y="58" width="160" height="34" rx="10" fill="#1d211b" opacity="0.85"/>
+      <rect x="424" y="58" width="112" height="28" rx="14" fill="#c7c0b2"/>
+      <rect x="58" y="118" width="220" height="30" rx="8" fill="#222720"/>
+      <rect x="58" y="160" width="166" height="18" rx="6" fill="#777064"/>
+      <rect x="58" y="190" width="142" height="40" rx="14" fill="#11140f"/>
+      <rect x="330" y="112" width="182" height="140" rx="18" fill="#8b9389"/>
+      <rect x="58" y="264" width="478" height="1.5" fill="#11140f" opacity="0.32"/>
+      <text x="424" y="255" fill="#11140f" font-family="Manrope, Inter, Arial, sans-serif" font-size="14" font-weight="700">fold 1</text>
+
+      <ellipse cx="395" cy="150" rx="180" ry="95" fill="url(#hotA)"/>
+      <ellipse cx="175" cy="146" rx="135" ry="78" fill="url(#hotB)"/>
+      <ellipse cx="150" cy="210" rx="126" ry="70" fill="url(#hotA)" opacity="0.62"/>
+      <rect x="58" y="190" width="142" height="40" rx="14" fill="#e90f2e" opacity="0.48"/>
+      <rect x="58" y="118" width="220" height="30" rx="8" fill="#ff653d" opacity="0.38"/>
+
+      <g transform="translate(22 326)">
+        <rect width="118" height="38" rx="18" fill="#1d211b" stroke="#f6f1e7" stroke-opacity="0.14"/>
+        <text x="28" y="25" fill="#f7f1e7" font-family="Manrope, Inter, Arial, sans-serif" font-size="14" font-weight="700">Original</text>
+        <rect x="130" width="118" height="38" rx="18" fill="#f6f1e7"/>
+        <text x="160" y="25" fill="#11140f" font-family="Manrope, Inter, Arial, sans-serif" font-size="14" font-weight="700">Heatmap</text>
+        <rect x="260" width="126" height="38" rx="18" fill="#1d211b" stroke="#f6f1e7" stroke-opacity="0.14"/>
+        <text x="288" y="25" fill="#c9c1b4" font-family="Manrope, Inter, Arial, sans-serif" font-size="14">Desktop</text>
+        <rect x="398" width="104" height="38" rx="18" fill="#1d211b" stroke="#f6f1e7" stroke-opacity="0.14"/>
+        <text x="425" y="25" fill="#c9c1b4" font-family="Manrope, Inter, Arial, sans-serif" font-size="14">Mobile</text>
+      </g>
+    </g>
+
+    <g transform="translate(662 112)">
+      <rect x="0" y="0" width="428" height="338" rx="24" fill="#1d211b" stroke="#f6f1e7" stroke-opacity="0.12"/>
+      <text x="28" y="38" fill="#f7f1e7" font-family="Manrope, Inter, Arial, sans-serif" font-size="24" font-weight="700">Predicted attention map</text>
+      <text x="28" y="68" fill="#c9c1b4" font-family="Manrope, Inter, Arial, sans-serif" font-size="16">Strongest area: hero image and CTA</text>
+      <text x="28" y="92" fill="#c9c1b4" font-family="Manrope, Inter, Arial, sans-serif" font-size="16">Quietest area: lower scroll section</text>
+
+      <g transform="translate(28 124)">
+        <rect width="372" height="54" rx="18" fill="#292d26" stroke="#f6f1e7" stroke-opacity="0.12"/>
+        <text x="18" y="24" fill="#f7f1e7" font-family="Manrope, Inter, Arial, sans-serif" font-size="16" font-weight="700">Above the fold</text>
+        <text x="298" y="24" fill="#f7f1e7" font-family="Manrope, Inter, Arial, sans-serif" font-size="16" font-weight="700">82/100</text>
+        <rect x="18" y="36" width="336" height="6" rx="3" fill="#3b3d36"/>
+        <rect x="18" y="36" width="278" height="6" rx="3" fill="url(#heat)"/>
+      </g>
+
+      <g transform="translate(28 194)">
+        <rect width="372" height="54" rx="18" fill="#292d26" stroke="#f6f1e7" stroke-opacity="0.12"/>
+        <text x="18" y="24" fill="#f7f1e7" font-family="Manrope, Inter, Arial, sans-serif" font-size="16" font-weight="700">Scroll section 2</text>
+        <text x="306" y="24" fill="#c9c1b4" font-family="Manrope, Inter, Arial, sans-serif" font-size="16" font-weight="700">46/100</text>
+        <rect x="18" y="36" width="336" height="6" rx="3" fill="#3b3d36"/>
+        <rect x="18" y="36" width="154" height="6" rx="3" fill="url(#heat)"/>
+      </g>
+
+      <g transform="translate(28 264)">
+        <rect width="372" height="54" rx="18" fill="#292d26" stroke="#f6f1e7" stroke-opacity="0.12"/>
+        <text x="18" y="24" fill="#f7f1e7" font-family="Manrope, Inter, Arial, sans-serif" font-size="16" font-weight="700">Before / after</text>
+        <text x="204" y="24" fill="#9fc4a3" font-family="Manrope, Inter, Arial, sans-serif" font-size="16" font-weight="700">+21 attention score</text>
+        <rect x="18" y="36" width="154" height="6" rx="3" fill="#d9b184"/>
+        <rect x="190" y="36" width="164" height="6" rx="3" fill="#9fc4a3"/>
+      </g>
+    </g>
+  </g>
+
+  <g transform="translate(64 684)">
+    <text x="0" y="0" fill="#c9c1b4" font-family="Manrope, Inter, Arial, sans-serif" font-size="17">Use it before launching a page, after a redesign, or when a hero section feels visually unclear.</text>
+  </g>
+</svg>
