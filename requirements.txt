@@ -4,10 +4,12 @@ python-multipart
 jinja2
 numpy
 pandas
+pillow
 torch>=2.5.1,<2.7
 matplotlib
 moviepy
 huggingface-hub
 openai-whisper
 imageio-ffmpeg
+playwright
 tribev2[plotting] @ https://github.com/facebookresearch/tribev2/archive/72399081ed3f1040c4d996cefb2864a4c46f5b8e.zip

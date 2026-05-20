@@ -155,7 +155,7 @@ function Test-PythonDependencies {
         return $false
     }
 
-    & $python -c "import re, sys; import fastapi, uvicorn, torch; m = re.match(r'(\d+)\.(\d+)\.(\d+)', torch.__version__); v = tuple(map(int, m.groups())) if m else (0, 0, 0); sys.exit(1) if not ((2, 5, 1) <= v < (2, 7, 0)) else None; import tribev2" 1>$null 2>$null
+    & $python -c "import re, sys; import fastapi, uvicorn, torch, playwright; import PIL.Image; m = re.match(r'(\d+)\.(\d+)\.(\d+)', torch.__version__); v = tuple(map(int, m.groups())) if m else (0, 0, 0); sys.exit(1) if not ((2, 5, 1) <= v < (2, 7, 0)) else None; import tribev2" 1>$null 2>$null
     return $LASTEXITCODE -eq 0
 }
 

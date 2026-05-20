@@ -118,6 +118,127 @@
       min-width: 0; color: var(--muted); font-size: 14px; line-height: 1.2;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    .url-input {
+      width: 100%;
+      min-height: 58px;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel-2);
+      color: var(--ink);
+      font: inherit;
+      outline: none;
+    }
+    .url-input:focus {
+      border-color: var(--ink);
+      box-shadow: inset 0 0 0 1px var(--ink);
+    }
+    .website-report-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+      gap: 18px;
+      align-items: start;
+      margin-top: 18px;
+    }
+    .website-heatmap-frame {
+      overflow: auto;
+      max-height: 860px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel-2);
+      box-shadow: var(--shadow-soft);
+    }
+    .website-heatmap-frame img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .website-tabs, .website-layer-controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .website-tab-button,
+    .website-layer-button {
+      min-height: 38px;
+      padding: 0 13px;
+      border-radius: 999px;
+      border-color: var(--line);
+      background: var(--panel-2);
+      color: var(--ink);
+      box-shadow: none;
+    }
+    .website-tab-button.is-active,
+    .website-layer-button.is-active {
+      background: var(--ink);
+      color: #ffffff;
+      border-color: var(--ink);
+    }
+    .website-capture-panel { display: none; }
+    .website-capture-panel.is-active { display: block; }
+    .website-image-stack {
+      position: relative;
+      min-width: 280px;
+    }
+    .website-image-stack img {
+      display: none;
+    }
+    .website-image-stack[data-layer="heatmap"] img[data-layer-image="heatmap"],
+    .website-image-stack[data-layer="original"] img[data-layer-image="original"] {
+      display: block;
+    }
+    .fold-marker {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: var(--fold-top, 0%);
+      border-top: 2px solid rgba(255, 255, 255, 0.94);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.34), 0 0 18px rgba(236, 78, 55, 0.52);
+      pointer-events: none;
+    }
+    .fold-marker span {
+      position: absolute;
+      top: -12px;
+      left: 12px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #11110f;
+      color: #ffffff;
+      font-size: 11px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .website-side {
+      display: grid;
+      gap: 12px;
+      position: sticky;
+      top: 16px;
+    }
+    .website-section-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      padding: 16px;
+    }
+    .website-meter {
+      height: 8px;
+      border-radius: 99px;
+      overflow: hidden;
+      background: rgba(31, 31, 29, 0.12);
+      margin-top: 12px;
+    }
+    .website-meter span {
+      display: block;
+      height: 100%;
+      width: var(--score, 0%);
+      background: linear-gradient(90deg, #6aa4ff, #f0db67 52%, #ec4e37);
+    }
+    .website-variant-block + .website-variant-block {
+      margin-top: 26px;
+      padding-top: 26px;
+      border-top: 1px solid var(--line);
+    }
     button, .button-link {
       display: inline-flex; align-items: center; justify-content: center; min-height: 56px; padding: 0 22px; border: 1px solid var(--ink); border-radius: 18px; text-decoration: none; color: #ffffff; font-weight: 600; cursor: pointer;
       background: var(--ink); box-shadow: none;
@@ -1458,6 +1579,12 @@
       .sources-footer-actions {
         justify-content: flex-start;
       }
+      .website-report-grid {
+        grid-template-columns: 1fr;
+      }
+      .website-side {
+        position: static;
+      }
       .metrics-row {
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
@@ -1685,7 +1812,7 @@
         <div class="hero-copy">
           <p class="chip">Official TRIBE v2 workflow</p>
           <h1>Predict virality with Meta TRIBE v2</h1>
-          <p class="lead">This ads analyze any video and shows its "viral potential" by modelling the viewer's brain activity heatmap while watching the video.</p>
+          <p class="lead">Analyze videos, hooks, and landing pages through a predicted TRIBE response map before you edit or launch.</p>
         </div>
         <div class="hero-aside">
           <div class="hero-panel">
@@ -1746,6 +1873,39 @@
           <div class="submit-progress-track"><span class="submit-progress-line"></span></div>
         </div>
       </form>
+      <form class="card upload-card" action="/review-url" method="post" data-analysis-form>
+        <div class="section-head">
+          <div>
+            <h2>{{ "Website review" if language == "en" else "Разбор сайта" }}</h2>
+            <p class="muted upload-lead">{{ "Paste a landing page URL, or add a second URL for before/after comparison. The app captures full-page desktop and mobile views." if language == "en" else "Вставь URL лендинга или добавь второй URL для сравнения до/после. Приложение снимет полную desktop и mobile страницу." }}</p>
+          </div>
+          <div class="meta-row upload-meta">
+            <span class="pill">{{ "full page capture" if language == "en" else "снимок всей страницы" }}</span>
+            <span class="pill">{{ "desktop + mobile" if language == "en" else "desktop + mobile" }}</span>
+            <span class="pill">{{ "Chrome or Edge required" if language == "en" else "нужен Chrome или Edge" }}</span>
+          </div>
+        </div>
+        <div class="upload-grid">
+          <div class="upload-field-col">
+            <div class="field-stack" style="margin-top: 14px;">
+              <input type="hidden" name="analysis_mode" value="deep">
+              <input class="url-input" type="url" name="website_url" placeholder="https://example.com" autocomplete="url" required>
+              <input class="url-input" type="url" name="compare_website_url" placeholder="Optional compare URL / before-after" autocomplete="url">
+            </div>
+          </div>
+          <div class="upload-actions">
+            <button type="submit" data-submit-button data-busy-label="{{ 'Capturing website' if language == 'en' else 'Снимаю сайт' }}">{{ "Analyze URL" if language == "en" else "Разобрать URL" }}</button>
+          </div>
+          <p class="action-note">{{ "Use this for landing pages, product pages, mobile checks, and before/after design comparisons." if language == "en" else "Подходит для лендингов, карточек продукта, mobile-проверки и сравнения дизайна до/после." }}</p>
+        </div>
+        <div class="submit-progress" data-submit-progress aria-live="polite">
+          <div class="submit-progress-head">
+            <span>{{ "Capturing the page and building the attention map..." if language == "en" else "Снимаю страницу и строю карту внимания..." }}</span>
+            <span>{{ "This can take a while" if language == "en" else "Это может занять время" }}</span>
+          </div>
+          <div class="submit-progress-track"><span class="submit-progress-line"></span></div>
+        </div>
+      </form>
       {% endif %}
 
       {% if error %}
@@ -1753,6 +1913,114 @@
       {% endif %}
 
       {% if result %}
+      {% if result.source_kind == "website" %}
+      <div class="card">
+        <div class="result-top">
+          <div>
+            <div class="pill-row result-pills">
+              <p class="chip">Report {{ result.report_id }} В· {{ result.created_at }}</p>
+              <span class="pill">{{ "Website review" if language == "en" else "Разбор сайта" }}</span>
+              <span class="pill">{{ result.website.variants | length }} {{ "URL" if result.website.variants|length == 1 else "URLs" }}</span>
+            </div>
+            <h2 style="margin-top: 10px;">{{ "Predicted website attention map" if language == "en" else "Предсказанная карта внимания сайта" }}</h2>
+            <p class="lead" style="font-size: 16px; max-width: 980px;">{{ "Full-page desktop and mobile captures with original/heatmap toggle, fold markers, section scores, and practical layout recommendations." if language == "en" else "Полные desktop и mobile снимки с переключением original/heatmap, линиями fold, оценкой секций и практическими рекомендациями." }}</p>
+          </div>
+          {% if not pdf_mode %}
+          <div class="button-row result-actions">
+            <a class="button-link secondary" href="{{ result.report_url }}" target="_blank" rel="noopener">{{ ui.open_json }}</a>
+            <a class="button-link" href="{{ result.report_pdf_url }}">{{ ui.download_pdf }}</a>
+          </div>
+          {% endif %}
+        </div>
+
+        {% set first_capture = result.website.variants[0].captures.desktop %}
+        <div class="banner">{{ first_capture.summary.note }}</div>
+
+        {% if result.website.comparison %}
+        <div class="section">
+          <h3>{{ "Before / after comparison" if language == "en" else "Сравнение до/после" }}</h3>
+          <div class="summary-grid" style="margin-top: 14px;">
+            {% for row in result.website.comparison.rows %}
+            <div class="summary-card">
+              <div class="chip">{{ row.label }}</div>
+              <div class="score-badge">{{ "%+d"|format(row.delta) }}</div>
+              <p class="muted">{{ result.website.variants[0].title }}: {{ row.first_score }}/100</p>
+              <p class="muted">{{ result.website.variants[1].title }}: {{ row.second_score }}/100</p>
+              <p class="muted" style="margin-top: 8px;">{{ "Stronger read" if language == "en" else "Сильнее выглядит" }}: {{ row.winner }}</p>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% for variant in result.website.variants %}
+        <div class="website-variant-block">
+          <div class="pill-row" style="margin-bottom: 12px;">
+            <span class="pill">{{ variant.label }}</span>
+            <span class="pill">{{ variant.url }}</span>
+          </div>
+          <div class="website-tabs" data-website-tabs="variant-{{ variant.key }}">
+            {% for device_key, capture in variant.captures.items() %}
+            <button type="button" class="website-tab-button{% if loop.first %} is-active{% endif %}" data-website-tab-target="{{ variant.key }}-{{ device_key }}">{{ capture.label }}</button>
+            {% endfor %}
+          </div>
+
+          {% for device_key, capture in variant.captures.items() %}
+          <div class="website-capture-panel{% if loop.first %} is-active{% endif %}" data-website-panel="{{ variant.key }}-{{ device_key }}">
+            <div class="website-report-grid">
+              <div>
+                <div class="website-layer-controls">
+                  <button type="button" class="website-layer-button" data-website-layer-target="{{ variant.key }}-{{ device_key }}" data-website-layer="original">{{ "Original" if language == "en" else "Оригинал" }}</button>
+                  <button type="button" class="website-layer-button is-active" data-website-layer-target="{{ variant.key }}-{{ device_key }}" data-website-layer="heatmap">{{ "Heatmap" if language == "en" else "Heatmap" }}</button>
+                  <a class="button-link secondary" style="min-height: 38px; padding: 0 13px; border-radius: 999px;" href="{{ capture.heatmap_url }}" download="{{ capture.download_name }}">{{ "Download heatmap" if language == "en" else "Скачать heatmap" }}</a>
+                </div>
+                <div class="website-heatmap-frame">
+                  <div class="website-image-stack" data-website-image="{{ variant.key }}-{{ device_key }}" data-layer="heatmap">
+                    <img data-layer-image="original" src="{{ capture.screenshot_url }}" alt="Website original screenshot">
+                    <img data-layer-image="heatmap" src="{{ capture.heatmap_url }}" alt="Predicted website attention heatmap">
+                    {% for section in capture.sections %}
+                    {% if not loop.first %}
+                    <div class="fold-marker" style="--fold-top: {{ section.top_percent }}%;"><span>{{ section.label }}</span></div>
+                    {% endif %}
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+              <div class="website-side">
+                <div class="website-section-card">
+                  <div class="chip">{{ "Page read" if language == "en" else "Итог страницы" }}</div>
+                  <h3 style="margin-top: 12px;">{{ capture.summary.headline }}</h3>
+                  <p class="muted" style="margin-top: 10px;">{{ capture.summary.page_size }} · {{ capture.summary.sections_count }} {{ "scroll sections" if language == "en" else "секций прокрутки" }}</p>
+                  <p class="muted">{{ "Avg attention" if language == "en" else "Среднее внимание" }}: {{ capture.summary.avg_score }}/100</p>
+                  <p class="muted">{{ "Strongest" if language == "en" else "Самая сильная" }}: {{ capture.summary.strongest_section }}</p>
+                </div>
+                <div class="website-section-card">
+                  <div class="chip">{{ "Recommendations" if language == "en" else "Рекомендации" }}</div>
+                  <ul class="list" style="margin-top: 12px;">
+                    {% for item in capture.recommendations %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                {% for section in capture.sections %}
+                <div class="website-section-card">
+                  <div class="pill-row">
+                    <span class="chip">{{ section.label }}</span>
+                    <span class="pill">{{ section.score }}/100</span>
+                  </div>
+                  <div class="website-meter" style="--score: {{ section.score }}%;"><span></span></div>
+                  <p class="muted" style="margin-top: 12px;">{{ section.summary }}</p>
+                  <p class="muted" style="font-size: 12px; margin-top: 8px;">{{ section.range }}</p>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
       <div class="card">
         {% set analysis_mode_key = "deep" %}
         {% set editorial = result.editorial %}
@@ -2178,6 +2446,7 @@
         {% endif %}
       </div>
       {% endif %}
+      {% endif %}
     </div>
     {% if not pdf_mode %}
     <div class="sources-footer">
@@ -2249,11 +2518,12 @@
       }
 
       function bindSubmitProgress() {
-        const form = document.querySelector("[data-analysis-form]");
-        if (!form) return;
-        const submitButton = form.querySelector("[data-submit-button]");
-        const progress = form.querySelector("[data-submit-progress]");
-        form.addEventListener("submit", () => {
+        const forms = document.querySelectorAll("[data-analysis-form]");
+        if (!forms.length) return;
+        forms.forEach((form) => {
+          const submitButton = form.querySelector("[data-submit-button]");
+          const progress = form.querySelector("[data-submit-progress]");
+          form.addEventListener("submit", () => {
           if (progress) {
             progress.classList.add("is-visible");
           }
@@ -2264,6 +2534,35 @@
               submitButton.textContent = submitButton.dataset.busyLabel;
             }
           }
+          });
+        });
+      }
+
+      function bindWebsiteControls() {
+        document.querySelectorAll("[data-website-tabs]").forEach((group) => {
+          group.querySelectorAll("[data-website-tab-target]").forEach((button) => {
+            button.addEventListener("click", () => {
+              const target = button.dataset.websiteTabTarget;
+              group.querySelectorAll("[data-website-tab-target]").forEach((item) => {
+                item.classList.toggle("is-active", item === button);
+              });
+              document.querySelectorAll("[data-website-panel]").forEach((panel) => {
+                panel.classList.toggle("is-active", panel.dataset.websitePanel === target);
+              });
+            });
+          });
+        });
+
+        document.querySelectorAll("[data-website-layer-target]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const target = button.dataset.websiteLayerTarget;
+            const layer = button.dataset.websiteLayer || "heatmap";
+            const stack = document.querySelector(`[data-website-image="${CSS.escape(target)}"]`);
+            if (stack) stack.dataset.layer = layer;
+            document.querySelectorAll(`[data-website-layer-target="${CSS.escape(target)}"]`).forEach((item) => {
+              item.classList.toggle("is-active", item === button);
+            });
+          });
         });
       }
 
@@ -2988,6 +3287,7 @@
 
       bindFilePicker();
       bindSubmitProgress();
+      bindWebsiteControls();
       bindThemeToggle();
       applyTimelineColors();
       bindDraggableBoards();

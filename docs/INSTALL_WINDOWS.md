@@ -16,6 +16,8 @@ Recommended local setup:
 
 The first launch downloads Python packages, official TRIBE v2 model files, the Whisper speech model, and local video/audio tooling.
 
+Website URL review requires Google Chrome or Microsoft Edge. The app uses the local browser only to capture screenshots of the page.
+
 ## 1. Download
 
 1. Open the GitHub repository page.
@@ -51,6 +53,20 @@ http://127.0.0.1:8000
 ```
 
 Later launches are much faster because the setup files are already installed.
+
+## Website URL review
+
+Paste a landing-page URL into the Website review form.
+
+The app captures:
+
+- desktop full-page screenshot
+- mobile full-page screenshot
+- original and heatmap views
+- fold-by-fold section scores
+- optional before/after comparison when a second URL is provided
+
+This is not eye-tracking. It is a visual attention estimate for layout review.
 
 ## 5. Optional Hugging Face login
 

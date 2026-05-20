@@ -1,8 +1,10 @@
 # TRIBE Review MVP
 
-Private local web app for analyzing short video ads with Meta TRIBE v2 and presenting the result as an editing-friendly review.
+Private local web app for analyzing short video ads with Meta TRIBE v2 and presenting the result as an editing-friendly review. It also includes an experimental website review mode for landing-page attention maps.
 
 The app runs the official TRIBE v2 inference path, visualizes the predicted brain-response curve and heatmap, and adds a practical recommendation layer for comparing cuts and finding weak moments in the timeline.
+
+Website review mode does not claim eye-tracking. It captures landing pages in a local browser and builds a visual attention estimate from page structure, contrast, color, and layout signals.
 
 ## Credits and sources
 
@@ -33,6 +35,9 @@ This repository is a non-commercial community prototype built around the officia
 - Exports JSON and PDF reports.
 - Uses a local Whisper speech layer for transcript/timing hints.
 - Optionally uses Ollama for local recommendation copy rewriting when a supported local model is available.
+- Reviews landing-page URLs with desktop and mobile captures.
+- Shows original/heatmap toggles, fold markers, section scores, and layout recommendations.
+- Compares two website URLs for before/after design checks.
 
 ## What it is not
 
@@ -84,6 +89,20 @@ Typical edits:
 
 Full workflow notes: [docs/WORKFLOWS.md](docs/WORKFLOWS.md)
 
+### C. Review a website URL
+
+Use website mode for landing pages, hero sections, product pages, and before/after redesign checks.
+
+Typical use:
+
+1. Paste one website URL.
+2. Review the desktop and mobile captures.
+3. Toggle between original and heatmap views.
+4. Use fold markers to inspect each scroll section.
+5. Read the layout recommendations and adjust the page.
+
+For before/after checks, paste a second URL in the optional compare field. The app compares the desktop and mobile attention scores side by side.
+
 ## Project structure
 
 ```text
@@ -94,6 +113,8 @@ Full workflow notes: [docs/WORKFLOWS.md](docs/WORKFLOWS.md)
 |-- official_report.py             # Official-output report layer
 |-- review_engine.py               # Local recommendation and comparison logic
 |-- brain_visualization.py         # Brain heatmap visualization data
+|-- website_capture.py             # Local browser website screenshot capture
+|-- website_analysis.py            # Website attention heatmap and section scoring
 |-- report_localization.py         # UI/report copy layer
 |-- pdf_report.py                  # Chrome-based HTML-to-PDF export
 |-- templates/index.html           # Main web UI
@@ -117,7 +138,7 @@ For non-technical users:
 8. Double-click `Start_TRIBE_Review.cmd` again.
 9. The app should open in your browser.
 
-The first launch can take a while because the app downloads and installs everything it needs. Later launches are much faster.
+The first launch can take a while because the app downloads and installs everything it needs. Later launches are much faster. Website URL mode uses a locally installed Chrome or Microsoft Edge browser for screenshots.
 
 Quick command version:
 
@@ -156,7 +177,7 @@ That folder is intentionally ignored by Git. Do not commit runtime media, report
 Run a syntax check:
 
 ```powershell
-python -m py_compile app.py bootstrap_models.py tribe_runtime.py speech_runtime.py official_report.py review_engine.py report_localization.py pdf_report.py brain_visualization.py runtime_setup.py
+python -m py_compile app.py bootstrap_models.py tribe_runtime.py speech_runtime.py official_report.py review_engine.py report_localization.py pdf_report.py brain_visualization.py runtime_setup.py website_capture.py website_analysis.py
 ```
 
 Run a smoke test with a local video:

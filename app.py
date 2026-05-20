@@ -30,6 +30,8 @@ from report_localization import (
 from review_engine import generate_comparison_report, generate_review
 from speech_runtime import SpeechTranscriber
 from tribe_runtime import TribeVideoBackend
+from website_analysis import build_website_attention_report
+from website_capture import capture_website_screenshot, get_viewport_config
 
 
 apply_review_engine_patch()
@@ -97,6 +99,17 @@ async def get_media(report_id: str, variant_key: str) -> FileResponse:
     if media_path:
         return FileResponse(media_path, media_type="video/mp4")
     raise HTTPException(status_code=404, detail="Video not found")
+
+
+@app.get("/media/{report_id}/website/{asset_name}")
+async def get_website_asset(report_id: str, asset_name: str) -> FileResponse:
+    if not re.match(r"^[a-z0-9_-]+\.(?:png|jpg|jpeg)$", asset_name, re.IGNORECASE):
+        raise HTTPException(status_code=404, detail="Asset not found")
+    asset_path = MEDIA_DIR / report_id / asset_name
+    if not asset_path.exists():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    media_type = "image/png" if asset_path.suffix.lower() == ".png" else "image/jpeg"
+    return FileResponse(asset_path, media_type=media_type)
 
 
 @app.get("/reports/{report_id}", response_class=HTMLResponse)
@@ -184,6 +197,60 @@ async def review_video(
         )
 
 
+@app.post("/review-url", response_class=HTMLResponse)
+async def review_website_url(
+    request: Request,
+    website_url: str = Form(...),
+    compare_website_url: str | None = Form(None),
+    analysis_mode: str = Form(DEFAULT_ANALYSIS_MODE),
+    lang: str | None = None,
+) -> HTMLResponse:
+    report_id = uuid4().hex[:12]
+    report_media_dir = MEDIA_DIR / report_id
+    language = normalize_report_language(lang)
+    selected_analysis_mode = _normalize_analysis_mode(analysis_mode)
+
+    try:
+        urls = [website_url.strip()]
+        if compare_website_url and compare_website_url.strip():
+            urls.append(compare_website_url.strip())
+        if len(urls) > 2:
+            raise ValueError("Website comparison supports up to 2 URLs.")
+
+        variants = []
+        for index, url in enumerate(urls, start=1):
+            variants.append(await _build_website_variant(url, report_id, report_media_dir, index))
+
+        result = {
+            "mode": "website",
+            "source_kind": "website",
+            "report_id": report_id,
+            "created_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+            "title": _website_variant_name(website_url),
+            "website_url": website_url.strip(),
+            "website": {
+                "variants": variants,
+                "comparison": _build_website_comparison(variants),
+            },
+            "analysis_mode": {"key": selected_analysis_mode, "label": selected_analysis_mode},
+        }
+        _store_report(report_id, result)
+        return _render_page(
+            request,
+            result=_get_localized_report(result, language),
+            error=None,
+            language=language,
+        )
+    except Exception as exc:
+        return _render_page(
+            request,
+            result=None,
+            error=_format_error(exc, language),
+            language=language,
+            status_code=500,
+        )
+
+
 def _render_page(
     request: Request,
     result: dict | None,
@@ -234,25 +301,43 @@ async def _analyze_upload(
     target_path.write_bytes(await upload.read())
 
     variant_name = Path(upload.filename or target_path.name).stem
-    run = backend.predict_video(target_path)
+    return _analyze_media_path(
+        media_path=target_path,
+        report_id=report_id,
+        variant_key=variant_key,
+        variant_name=variant_name,
+        analysis_mode=analysis_mode,
+    )
+
+
+def _analyze_media_path(
+    media_path: Path,
+    report_id: str,
+    variant_key: str,
+    variant_name: str,
+    analysis_mode: str,
+    skip_speech: bool = False,
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    run = backend.predict_video(media_path)
     result = generate_official_report(
-        target_path,
+        media_path,
         run,
         variant_name=variant_name,
     )
     result["variant_key"] = variant_key
     result["media_url"] = f"/media/{report_id}/{variant_key}"
-    result["_media_path"] = str(target_path)
+    result["_media_path"] = str(media_path)
     result["brain_simulation"] = build_brain_simulation(run.preds, run.timestamps)
     result["report_id"] = report_id
     result["created_at"] = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
     editorial = _build_editorial_layer(
-        target_path,
+        media_path,
         run,
         variant_name=variant_name,
         official_result=result,
         analysis_mode=analysis_mode,
+        skip_speech=skip_speech,
     )
     if editorial:
         result["editorial"] = editorial
@@ -281,6 +366,73 @@ def _get_localized_report(report: dict, language: str) -> dict:
         localized["report_pdf_url"] = f"/reports/{report_id}.pdf?lang={lang}"
     localized["report_language"] = lang
     return localized
+
+
+def _website_variant_name(url: str) -> str:
+    value = (url or "").strip()
+    value = re.sub(r"^https?://", "", value, flags=re.IGNORECASE)
+    value = value.split("/", 1)[0].strip() or "Website review"
+    return value
+
+
+async def _build_website_variant(url: str, report_id: str, report_media_dir: Path, index: int) -> dict[str, Any]:
+    key = f"site{index}"
+    captures = {}
+    for device in ("desktop", "mobile"):
+        viewport = get_viewport_config(device)
+        asset_prefix = f"{key}-{device}"
+        screenshot_path = await capture_website_screenshot(
+            url,
+            report_media_dir,
+            name=f"{asset_prefix}-screenshot",
+            viewport=device,
+        )
+        heatmap_path = report_media_dir / f"{asset_prefix}-heatmap.jpg"
+        attention = build_website_attention_report(
+            screenshot_path,
+            heatmap_path,
+            viewport_height=int(viewport["height"]),
+        )
+        captures[device] = {
+            "device": device,
+            "label": str(viewport["label"]),
+            "viewport_width": int(viewport["width"]),
+            "viewport_height": int(viewport["height"]),
+            "screenshot_url": f"/media/{report_id}/website/{asset_prefix}-screenshot.png",
+            "heatmap_url": f"/media/{report_id}/website/{asset_prefix}-heatmap.jpg",
+            "download_name": f"{asset_prefix}-heatmap.jpg",
+            "summary": attention.summary,
+            "sections": attention.sections,
+            "recommendations": attention.recommendations,
+        }
+    return {
+        "key": key,
+        "label": "Primary URL" if index == 1 else "Comparison URL",
+        "title": _website_variant_name(url),
+        "url": url,
+        "captures": captures,
+    }
+
+
+def _build_website_comparison(variants: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if len(variants) < 2:
+        return None
+    rows = []
+    for device in ("desktop", "mobile"):
+        first = variants[0]["captures"][device]["summary"]
+        second = variants[1]["captures"][device]["summary"]
+        delta = int(second.get("avg_score", 0)) - int(first.get("avg_score", 0))
+        rows.append(
+            {
+                "device": device,
+                "label": variants[0]["captures"][device]["label"],
+                "first_score": first.get("avg_score", 0),
+                "second_score": second.get("avg_score", 0),
+                "delta": delta,
+                "winner": variants[1]["title"] if delta > 0 else variants[0]["title"] if delta < 0 else "Even",
+            }
+        )
+    return {"rows": rows}
 
 
 def _refresh_comparison_report(report: dict) -> dict:
@@ -404,13 +556,15 @@ def _build_editorial_layer(
     variant_name: str,
     official_result: dict[str, Any] | None = None,
     analysis_mode: str = DEFAULT_ANALYSIS_MODE,
+    skip_speech: bool = False,
 ) -> dict | None:
     speech = None
     speech_error = None
-    try:
-        speech = speech_backend.transcribe(video_path, analysis_mode=analysis_mode)
-    except Exception as exc:
-        speech_error = str(exc).strip()
+    if not skip_speech:
+        try:
+            speech = speech_backend.transcribe(video_path, analysis_mode=analysis_mode)
+        except Exception as exc:
+            speech_error = str(exc).strip()
 
     try:
         review = generate_review(
