@@ -42,8 +42,16 @@ COOKIE_BUTTON_PATTERNS = [
     r"accepter",
     r"rechazar",
     r"aceptar",
+    r"acepto",
+    r"s[ií],?\s*acepto",
+    r"no,?\s*gracias",
     r"rifiuta",
     r"accetta",
+    r"no thanks",
+    r"thanks,?\s*no",
+    r"nee,?\s*bedankt",
+    r"weigeren",
+    r"accepteren",
 ]
 COOKIE_SELECTOR_CANDIDATES = [
     "#onetrust-reject-all-handler",
