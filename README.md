@@ -37,6 +37,7 @@ This repository is a non-commercial community prototype built around the officia
 - Optionally uses Ollama for local recommendation copy rewriting when a supported local model is available.
 - Reviews landing-page URLs with desktop and mobile captures.
 - Shows original/heatmap toggles, fold markers, section scores, and layout recommendations.
+- Attempts to close common cookie/GDPR banners before website screenshots.
 - Compares two website URLs for before/after design checks.
 
 ## What it is not

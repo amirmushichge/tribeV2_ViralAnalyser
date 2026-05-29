@@ -14,6 +14,49 @@ VIEWPORTS = {
 }
 DESKTOP_VIEWPORT = VIEWPORTS["desktop"]
 VIDEO_SIZE = "1280:720"
+COOKIE_BUTTON_PATTERNS = [
+    r"reject all",
+    r"reject",
+    r"decline",
+    r"deny",
+    r"only necessary",
+    r"necessary only",
+    r"accept all",
+    r"allow all",
+    r"agree",
+    r"i agree",
+    r"accept",
+    r"continue",
+    r"got it",
+    r"ok",
+    r"принять",
+    r"соглас",
+    r"отклон",
+    r"alle ablehnen",
+    r"ablehnen",
+    r"alle akzeptieren",
+    r"akzeptieren",
+    r"tout refuser",
+    r"refuser",
+    r"tout accepter",
+    r"accepter",
+    r"rechazar",
+    r"aceptar",
+    r"rifiuta",
+    r"accetta",
+]
+COOKIE_SELECTOR_CANDIDATES = [
+    "#onetrust-reject-all-handler",
+    "#onetrust-accept-btn-handler",
+    "#CybotCookiebotDialogBodyButtonDecline",
+    "#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll",
+    "[data-testid='uc-deny-all-button']",
+    "[data-testid='uc-accept-all-button']",
+    "button[aria-label*='reject' i]",
+    "button[aria-label*='accept' i]",
+    "button[id*='reject' i]",
+    "button[id*='accept' i]",
+]
 
 
 async def capture_website_video(url: str, output_dir: Path, name: str = "website") -> tuple[Path, Path]:
@@ -82,6 +125,7 @@ async def _capture_screenshot(url: str, screenshot_path: Path, viewport: str = "
                     await page.wait_for_load_state("networkidle", timeout=7000)
                 except PlaywrightError:
                     pass
+                await _dismiss_cookie_banners(page, PlaywrightError)
                 await page.screenshot(path=str(screenshot_path), full_page=True)
                 return
             except PlaywrightError as exc:
@@ -93,6 +137,56 @@ async def _capture_screenshot(url: str, screenshot_path: Path, viewport: str = "
     raise RuntimeError(
         "Could not open the website in Chrome or Edge. Install Google Chrome or Microsoft Edge, then try again."
     ) from last_error
+
+
+async def _dismiss_cookie_banners(page, playwright_error_type: type[Exception]) -> bool:
+    dismissed = False
+    for _ in range(2):
+        if await _click_cookie_selector(page, playwright_error_type):
+            dismissed = True
+            await page.wait_for_timeout(700)
+            continue
+        if await _click_cookie_text(page, playwright_error_type):
+            dismissed = True
+            await page.wait_for_timeout(700)
+            continue
+        break
+    return dismissed
+
+
+async def _click_cookie_selector(page, playwright_error_type: type[Exception]) -> bool:
+    for frame in page.frames:
+        for selector in COOKIE_SELECTOR_CANDIDATES:
+            try:
+                target = frame.locator(selector).first
+                if await target.count() and await target.is_visible(timeout=250):
+                    await target.click(timeout=900)
+                    return True
+            except playwright_error_type:
+                continue
+            except Exception:
+                continue
+    return False
+
+
+async def _click_cookie_text(page, playwright_error_type: type[Exception]) -> bool:
+    for frame in page.frames:
+        for pattern in COOKIE_BUTTON_PATTERNS:
+            expression = re.compile(pattern, re.IGNORECASE)
+            for locator in (
+                frame.get_by_role("button", name=expression).first,
+                frame.get_by_role("link", name=expression).first,
+                frame.locator("button", has_text=expression).first,
+            ):
+                try:
+                    if await locator.count() and await locator.is_visible(timeout=250):
+                        await locator.click(timeout=900)
+                        return True
+                except playwright_error_type:
+                    continue
+                except Exception:
+                    continue
+    return False
 
 
 def _screenshot_to_video(screenshot_path: Path, video_path: Path) -> None:
