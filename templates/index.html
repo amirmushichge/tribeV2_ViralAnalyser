@@ -255,24 +255,60 @@
       gap: 8px;
     }
     .visual-preview-frame {
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      max-height: 430px;
-      min-height: 320px;
+      max-height: none;
+      min-height: 0;
+      padding: 10px;
     }
-    .visual-preview-frame .website-image-stack {
-      width: fit-content;
+    .visual-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      width: 100%;
       min-width: 0;
-      max-width: 100%;
     }
-    .visual-preview-frame .website-image-stack img {
-      width: auto;
-      max-width: 100%;
-      max-height: 430px;
-      height: auto;
-      object-fit: contain;
+    .visual-preview-tile {
+      position: relative;
+      overflow: hidden;
+      min-height: 190px;
+      aspect-ratio: 1 / 1;
+      border: 1px solid rgba(20, 20, 18, 0.16);
+      border-radius: 16px;
       background: var(--panel-2);
+    }
+    .visual-preview-tile img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .visual-preview-tile-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #11110f;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+    }
+    @media (max-width: 980px) {
+      .visual-preview-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .visual-preview-tile {
+        min-height: 170px;
+      }
+    }
+    @media (max-width: 620px) {
+      .visual-preview-grid {
+        grid-template-columns: 1fr;
+      }
     }
     .visual-cell-box {
       position: absolute;
@@ -2169,12 +2205,12 @@
               <a class="button-link secondary" style="min-height: 38px; padding: 0 13px; border-radius: 999px;" href="{{ result.visual_grid.heatmap_url }}" download="{{ result.visual_grid.download_name }}">{{ "Download heatmap" if language == "en" else "Скачать heatmap" }}</a>
             </div>
             <div class="website-heatmap-frame visual-preview-frame">
-              <div class="website-image-stack" data-website-image="visual-grid-{{ result.report_id }}" data-layer="heatmap">
-                <img data-layer-image="original" src="{{ result.visual_grid.original_url }}" alt="Original visual grid">
-                <img data-layer-image="heatmap" src="{{ result.visual_grid.heatmap_url }}" alt="Visual grid attention heatmap">
+              <div class="website-image-stack visual-preview-grid" data-website-image="visual-grid-{{ result.report_id }}" data-layer="heatmap">
                 {% for cell in result.visual_grid.cells %}
-                <div class="visual-cell-box" style="--left: {{ cell.box.left_percent }}%; --top: {{ cell.box.top_percent }}%; --width: {{ cell.box.width_percent }}%; --height: {{ cell.box.height_percent }}%;">
-                  <span>#{{ cell.rank }} · {{ cell.score }}</span>
+                <div class="visual-preview-tile">
+                  <img data-layer-image="original" src="{{ cell.crop_url }}" alt="{{ cell.label }}">
+                  <img data-layer-image="heatmap" src="{{ cell.heatmap_crop_url or cell.crop_url }}" alt="{{ cell.label }} heatmap">
+                  <span class="visual-preview-tile-badge">#{{ cell.rank }} · {{ cell.score }}</span>
                 </div>
                 {% endfor %}
               </div>

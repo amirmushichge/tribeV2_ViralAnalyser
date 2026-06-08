@@ -518,6 +518,9 @@ def _with_visual_asset_urls(report_id: str, cells: list[dict[str, Any]]) -> list
         crop_name = item.get("crop_name")
         if crop_name:
             item["crop_url"] = f"/media/{report_id}/assets/{crop_name}"
+        heatmap_crop_name = item.get("heatmap_crop_name")
+        if heatmap_crop_name:
+            item["heatmap_crop_url"] = f"/media/{report_id}/assets/{heatmap_crop_name}"
         enriched.append(item)
     return enriched
 

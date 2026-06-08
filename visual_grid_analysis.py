@@ -55,7 +55,7 @@ def build_visual_grid_report(
     overlay = _overlay_heatmap(image, heat)
     overlay.save(heatmap_path, quality=92)
 
-    cells = _build_cells(image, heat, output_dir, columns, rows)
+    cells = _build_cells(image, overlay, heat, output_dir, columns, rows)
     ranked = sorted(cells, key=lambda item: item["score"], reverse=True)
     for rank, cell in enumerate(ranked, start=1):
         cell["rank"] = rank
@@ -118,6 +118,7 @@ def _clean_dimension(value: int | None) -> int | None:
 
 def _build_cells(
     image: Image.Image,
+    overlay: Image.Image,
     heat: np.ndarray,
     output_dir: Path,
     columns: int,
@@ -151,7 +152,9 @@ def _build_cells(
             metrics = _cell_metrics(heat_crop, gray_crop, rgb_crop, edge_crop, col, row, columns, rows)
             score = _cell_score(metrics)
             crop_path = output_dir / f"visual-cell-{index:02d}.jpg"
+            heatmap_crop_path = output_dir / f"visual-cell-{index:02d}-heatmap.jpg"
             image.crop(crop_box).save(crop_path, quality=92)
+            overlay.crop(crop_box).save(heatmap_crop_path, quality=92)
             cells.append(
                 {
                     "index": index,
@@ -160,6 +163,7 @@ def _build_cells(
                     "column": col + 1,
                     "score": score,
                     "crop_name": crop_path.name,
+                    "heatmap_crop_name": heatmap_crop_path.name,
                     "box": {
                         "x": x0,
                         "y": y0,
