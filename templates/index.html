@@ -246,10 +246,23 @@
     }
     .visual-report-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
-      gap: 18px;
+      grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+      gap: 12px;
       align-items: start;
-      margin-top: 18px;
+      margin-top: 10px;
+    }
+    .visual-report-grid .website-side {
+      gap: 8px;
+    }
+    .visual-preview-frame {
+      max-height: 260px;
+      min-height: 230px;
+    }
+    .visual-preview-frame .website-image-stack img {
+      max-height: 260px;
+      min-height: 230px;
+      object-fit: contain;
+      background: var(--panel-2);
     }
     .visual-cell-box {
       position: absolute;
@@ -300,6 +313,103 @@
       border-radius: 14px;
       border: 1px solid var(--line);
       background: var(--panel-2);
+    }
+    .visual-top-list {
+      display: grid;
+      gap: 5px;
+      margin-top: 6px;
+    }
+    .visual-top-item {
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr);
+      gap: 6px;
+      align-items: center;
+      padding: 5px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+    }
+    .visual-top-item img {
+      width: 36px;
+      height: 32px;
+      object-fit: cover;
+      border-radius: 9px;
+      border: 1px solid var(--line);
+    }
+    .visual-top-item .pill {
+      min-height: 20px;
+      padding: 2px 6px;
+      font-size: 10px;
+    }
+    .visual-top-item strong {
+      display: block;
+      margin-top: 3px;
+      font-size: 12px;
+      line-height: 1;
+    }
+    .visual-compact-card {
+      padding: 10px;
+    }
+    .visual-compact-card h3 {
+      margin-top: 8px !important;
+      font-size: 16px;
+      line-height: 1.05;
+    }
+    .visual-compact-card .big-number {
+      font-size: 26px;
+      line-height: 1;
+    }
+    .visual-compact-card p.muted {
+      margin-top: 5px !important;
+      line-height: 1.15 !important;
+    }
+    .visual-compact-card .list {
+      margin-top: 8px !important;
+    }
+    .visual-compact-card .list li {
+      margin-top: 4px;
+      line-height: 1.2;
+    }
+    .visual-all-section {
+      margin-top: 10px;
+      padding-top: 10px;
+    }
+    .visual-all-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .visual-all-card {
+      display: grid;
+      grid-template-columns: 70px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      min-height: 90px;
+      padding: 8px;
+    }
+    .visual-all-card .visual-cell-thumb {
+      width: 70px;
+      height: 70px;
+      aspect-ratio: auto;
+    }
+    .visual-all-card .score-badge {
+      font-size: 18px;
+      margin-top: 3px;
+    }
+    .visual-all-card .pill {
+      min-height: 28px;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+    .visual-all-card p.muted {
+      display: -webkit-box;
+      margin-top: 4px !important;
+      font-size: 12px;
+      line-height: 1.1;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 1;
     }
     button, .button-link {
       display: inline-flex; align-items: center; justify-content: center; min-height: 56px; padding: 0 22px; border: 1px solid var(--ink); border-radius: 18px; text-decoration: none; color: #ffffff; font-weight: 600; cursor: pointer;
@@ -2048,7 +2158,7 @@
               <button type="button" class="website-layer-button is-active" data-website-layer-target="visual-grid-{{ result.report_id }}" data-website-layer="heatmap">{{ "Heatmap" if language == "en" else "Heatmap" }}</button>
               <a class="button-link secondary" style="min-height: 38px; padding: 0 13px; border-radius: 999px;" href="{{ result.visual_grid.heatmap_url }}" download="{{ result.visual_grid.download_name }}">{{ "Download heatmap" if language == "en" else "Скачать heatmap" }}</a>
             </div>
-            <div class="website-heatmap-frame">
+            <div class="website-heatmap-frame visual-preview-frame">
               <div class="website-image-stack" data-website-image="visual-grid-{{ result.report_id }}" data-layer="heatmap">
                 <img data-layer-image="original" src="{{ result.visual_grid.original_url }}" alt="Original visual grid">
                 <img data-layer-image="heatmap" src="{{ result.visual_grid.heatmap_url }}" alt="Visual grid attention heatmap">
@@ -2062,32 +2172,25 @@
           </div>
 
           <div class="website-side">
-            <div class="website-section-card">
+            <div class="website-section-card visual-compact-card">
               <div class="chip">{{ "Winner" if language == "en" else "Победитель" }}</div>
               <h3 style="margin-top: 12px;">{{ result.visual_grid.summary.top_label }}</h3>
               <div class="big-number">{{ result.visual_grid.summary.top_score }}</div>
               <p class="muted" style="margin-top: 8px;">{{ result.visual_grid.summary.columns }}×{{ result.visual_grid.summary.rows }} · {{ result.visual_grid.summary.image_size }}</p>
-            </div>
-            <div class="website-section-card">
-              <div class="chip">{{ "What to do" if language == "en" else "Что делать" }}</div>
-              <ul class="list" style="margin-top: 12px;">
-                {% for item in result.visual_grid.recommendations %}
-                <li>{{ item }}</li>
-                {% endfor %}
-              </ul>
-            </div>
-            <div class="website-section-card">
-              <div class="chip">{{ "Top picks" if language == "en" else "Топ вариантов" }}</div>
-              <div class="visual-cell-grid">
+              {% if result.visual_grid.recommendations %}
+              <p class="muted" style="margin-top: 8px; line-height: 1.2;">{{ result.visual_grid.recommendations[0] }}</p>
+              {% endif %}
+              <div class="visual-top-list">
                 {% for cell in result.visual_grid.top_picks %}
-                <div class="visual-cell-card is-top">
-                  <img class="visual-cell-thumb" src="{{ cell.crop_url }}" alt="{{ cell.label }}">
-                  <div class="pill-row" style="margin-top: 10px;">
-                    <span class="pill">#{{ cell.rank }}</span>
-                    <span class="pill">{{ cell.score }}/100</span>
+                <div class="visual-top-item">
+                  <img src="{{ cell.crop_url }}" alt="{{ cell.label }}">
+                  <div>
+                    <div class="pill-row">
+                      <span class="pill">#{{ cell.rank }}</span>
+                      <span class="pill">{{ cell.score }}/100</span>
+                    </div>
+                    <strong>{{ cell.label }}</strong>
                   </div>
-                  <strong style="display:block; margin-top: 10px;">{{ cell.label }}</strong>
-                  <p class="muted" style="margin-top: 8px;">{{ cell.reasons[0] }}</p>
                 </div>
                 {% endfor %}
               </div>
@@ -2095,24 +2198,21 @@
           </div>
         </div>
 
-        <div class="section">
+        <div class="section visual-all-section">
           <h3>{{ "All visual options" if language == "en" else "Все варианты" }}</h3>
-          <div class="visual-cell-grid">
+          <div class="visual-all-grid">
             {% for cell in result.visual_grid.cells %}
-            <div class="visual-cell-card{% if cell.rank <= 3 %} is-top{% endif %}">
+            <div class="visual-cell-card visual-all-card{% if cell.rank <= 3 %} is-top{% endif %}">
               <img class="visual-cell-thumb" src="{{ cell.crop_url }}" alt="{{ cell.label }}">
-              <div class="pill-row" style="margin-top: 10px;">
-                <span class="pill">{{ cell.label }}</span>
-                <span class="pill">#{{ cell.rank }}</span>
+              <div>
+                <div class="pill-row">
+                  <span class="pill">{{ cell.label }}</span>
+                  <span class="pill">#{{ cell.rank }}</span>
+                </div>
+                <div class="score-badge">{{ cell.score }}/100</div>
+                <div class="website-meter" style="--score: {{ cell.score }}%;"><span></span></div>
+                <p class="muted" style="margin-top: 8px;">{{ cell.reasons[0] }}</p>
               </div>
-              <div class="score-badge">{{ cell.score }}/100</div>
-              <div class="website-meter" style="--score: {{ cell.score }}%;"><span></span></div>
-              <ul class="list" style="margin-top: 12px;">
-                {% for reason in cell.reasons %}
-                <li>{{ reason }}</li>
-                {% endfor %}
-              </ul>
-              <p class="muted" style="margin-top: 10px;">{{ cell.risk }}</p>
             </div>
             {% endfor %}
           </div>
