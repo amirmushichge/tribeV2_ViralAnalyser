@@ -59,6 +59,9 @@ def build_visual_grid_report(
     ranked = sorted(cells, key=lambda item: item["score"], reverse=True)
     for rank, cell in enumerate(ranked, start=1):
         cell["rank"] = rank
+    for cell in ranked:
+        cell["reasons"] = _reasons(cell, len(ranked), rows, columns)
+        cell["risk"] = _risk(cell)
     cells = sorted(ranked, key=lambda item: item["index"])
     top_picks = [cell for cell in ranked[: min(3, len(ranked))]]
     summary = _summary(image.size, columns, rows, ranked)
@@ -168,8 +171,8 @@ def _build_cells(
                         "height_percent": round((y1 - y0) / max(height, 1) * 100, 4),
                     },
                     "metrics": metrics,
-                    "reasons": _reasons(metrics),
-                    "risk": _risk(metrics),
+                    "reasons": [],
+                    "risk": "",
                 }
             )
     return cells
@@ -217,31 +220,114 @@ def _cell_score(metrics: dict[str, float]) -> int:
     return int(round(max(0.0, min(1.0, raw)) * 100))
 
 
-def _reasons(metrics: dict[str, float]) -> list[str]:
-    reasons: list[str] = []
+def _reasons(cell: dict[str, Any], total: int, rows: int, columns: int) -> list[str]:
+    metrics = cell["metrics"]
+    score = int(cell["score"])
+    rank = int(cell["rank"])
+    position = _position_name(int(cell["row"]), int(cell["column"]), rows, columns)
+    reasons: list[str] = [_rank_reason(rank, total, score, position)]
+
     if metrics["attention_peak"] >= 0.72:
-        reasons.append("Strong hotspot: the eye has a clear place to land.")
-    if metrics["contrast"] >= 0.22:
-        reasons.append("Good contrast makes the visual easier to catch fast.")
-    if metrics["colorfulness"] >= 0.28:
-        reasons.append("Color separates it from nearby options.")
-    if metrics["center_bias"] >= 0.68:
-        reasons.append("Position is close to the natural scan path of the grid.")
+        reasons.append(_pick(cell, "The hottest area is easy to find, so the first read has a real anchor.", "A clear heat spike gives the viewer somewhere obvious to land.", "The main pull is not vague; one zone wins attention quickly."))
+    elif metrics["attention_peak"] >= 0.55:
+        reasons.append(_pick(cell, "It gets noticed, but the hotspot is not dominant enough to feel like a knockout.", "The read is decent; the main subject still has to work for attention.", "There is visible pull here, just not a runaway one."))
+    else:
+        reasons.append(_pick(cell, "The eye does not get a strong first target here.", "This option may be readable, but it does not interrupt the scan strongly.", "The heat is too soft to make this a confident first pick."))
+
     if metrics["focus"] >= 0.24:
-        reasons.append("Attention is concentrated instead of being spread everywhere.")
-    if not reasons:
-        reasons.append("Readable, but it does not create a strong attention advantage over the grid.")
-    return reasons[:3]
+        reasons.append(_pick(cell, "Attention is concentrated, which is useful for thumbnails and fast feeds.", "The visual has a focused landing zone instead of scattering the viewer.", "The composition gives one main place to look first."))
+    elif metrics["edge_density"] >= 0.24:
+        reasons.append(_pick(cell, "There is a lot going on, so the core idea may fight with details.", "Small details create texture, but they also dilute the first read.", "The design may need a cleaner hero element before launch."))
+    elif metrics["contrast"] >= 0.22:
+        reasons.append(_pick(cell, "Contrast helps it stay readable when the grid is scanned fast.", "The subject separates well enough from the background.", "Shape and value separation are doing useful work here."))
+    elif metrics["colorfulness"] >= 0.28:
+        reasons.append(_pick(cell, "Color gives it personality, even if the attention peak is not the strongest.", "The palette helps it stand apart from quieter options.", "Color is carrying part of the first impression."))
+    else:
+        reasons.append(_pick(cell, "It needs a sharper subject, stronger value contrast, or a cleaner focal point.", "The idea may be fine, but the visual signal is too polite.", "This one would benefit from a bolder foreground/background split."))
+
+    if metrics["center_bias"] >= 0.68:
+        reasons.append(f"{position.capitalize()} placement supports the natural scan path.")
+    elif score < 50:
+        reasons.append(f"{position.capitalize()} placement does not rescue the weaker attention pull.")
+
+    return _unique(reasons)[:3]
 
 
-def _risk(metrics: dict[str, float]) -> str:
+def _risk(cell: dict[str, Any]) -> str:
+    metrics = cell["metrics"]
+    score = int(cell["score"])
+    rank = int(cell["rank"])
     if metrics["edge_density"] >= 0.3:
-        return "May be noisy: too many small details can compete with the main subject."
+        return "Risk: visual noise may compete with the main subject."
     if metrics["contrast"] < 0.13 and metrics["colorfulness"] < 0.15:
-        return "May feel flat: contrast and color separation are both low."
+        return "Risk: the image may feel flat next to stronger options."
     if metrics["attention_peak"] < 0.42:
-        return "May be easy to skip: no strong hotspot was found."
-    return "No major visual risk detected."
+        return "Risk: easy to skip because no strong hotspot was found."
+    if rank == 1:
+        return "Best use: lead creative or first A/B test candidate."
+    if score >= 55:
+        return "Best use: backup test if the message fits this audience better."
+    return "Best use: support option after simplifying the focal point."
+
+
+def _rank_reason(rank: int, total: int, score: int, position: str) -> str:
+    if rank == 1:
+        return f"Winner read: {position} pulls attention first in this set."
+    if rank == 2 and total > 2:
+        return f"Second choice: close enough to test if the message is stronger."
+    if rank <= max(3, total // 2):
+        if score >= 55:
+            return f"Middle contender: useful, but it needs a clearer reason to beat the winner."
+        return f"Middle of the pack: visible, but not sharp enough as the lead option."
+    if score >= 55:
+        options = [
+            f"Backup angle: {position} has pull, just not enough to lead the set.",
+            f"Safe alternate: the idea reads, but it loses the first-glance fight.",
+            f"Usable variant: keep it for testing a different message, not as the main pick.",
+        ]
+    elif score >= 45:
+        options = [
+            f"Support visual: {position} is readable, but the hook needs more force.",
+            f"Scroll-past risk: it may blend in before the viewer understands the idea.",
+            f"Needs a sharper hook: the composition does not create a fast enough stop.",
+        ]
+    else:
+        options = [
+            f"Low-pull option: {position} needs a much clearer focal point.",
+            f"Easy to miss: the first read is weaker than the rest of the grid.",
+            f"Rework candidate: simplify the image before using it as a lead visual.",
+        ]
+    return options[(rank - 1) % len(options)]
+
+
+def _position_name(row: int, column: int, rows: int, columns: int) -> str:
+    vertical = "top" if row == 1 else "bottom" if row == rows else "middle"
+    horizontal = "left" if column == 1 else "right" if column == columns else "center"
+    if vertical == "middle" and horizontal == "center":
+        return "center"
+    if vertical == "middle":
+        return f"{horizontal} side"
+    if horizontal == "center":
+        return f"{vertical} center"
+    return f"{vertical} {horizontal}"
+
+
+def _pick(cell: dict[str, Any], *options: str) -> str:
+    if not options:
+        return ""
+    index = int(cell["index"]) - 1
+    rank = int(cell.get("rank", 1)) - 1
+    return options[(index + rank) % len(options)]
+
+
+def _unique(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique_items: list[str] = []
+    for item in items:
+        if item and item not in seen:
+            seen.add(item)
+            unique_items.append(item)
+    return unique_items
 
 
 def _summary(image_size: tuple[int, int], columns: int, rows: int, ranked: list[dict[str, Any]]) -> dict[str, Any]:
