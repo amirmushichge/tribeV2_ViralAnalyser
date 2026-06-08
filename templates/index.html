@@ -255,12 +255,22 @@
       gap: 8px;
     }
     .visual-preview-frame {
-      max-height: 260px;
-      min-height: 230px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      max-height: 430px;
+      min-height: 320px;
+    }
+    .visual-preview-frame .website-image-stack {
+      width: fit-content;
+      min-width: 0;
+      max-width: 100%;
     }
     .visual-preview-frame .website-image-stack img {
-      max-height: 260px;
-      min-height: 230px;
+      width: auto;
+      max-width: 100%;
+      max-height: 430px;
+      height: auto;
       object-fit: contain;
       background: var(--panel-2);
     }
@@ -321,19 +331,19 @@
     }
     .visual-top-item {
       display: grid;
-      grid-template-columns: 36px minmax(0, 1fr);
-      gap: 6px;
+      grid-template-columns: 44px minmax(0, 1fr);
+      gap: 8px;
       align-items: center;
-      padding: 5px;
+      padding: 7px;
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 14px;
       background: var(--panel);
     }
     .visual-top-item img {
-      width: 36px;
-      height: 32px;
+      width: 44px;
+      height: 40px;
       object-fit: cover;
-      border-radius: 9px;
+      border-radius: 10px;
       border: 1px solid var(--line);
     }
     .visual-top-item .pill {
@@ -344,11 +354,11 @@
     .visual-top-item strong {
       display: block;
       margin-top: 3px;
-      font-size: 12px;
-      line-height: 1;
+      font-size: 13px;
+      line-height: 1.05;
     }
     .visual-compact-card {
-      padding: 10px;
+      padding: 12px;
     }
     .visual-compact-card h3 {
       margin-top: 8px !important;
@@ -376,26 +386,26 @@
     }
     .visual-all-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 8px;
-      margin-top: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
     }
     .visual-all-card {
       display: grid;
-      grid-template-columns: 70px minmax(0, 1fr);
-      gap: 8px;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 10px;
       align-items: start;
-      min-height: 90px;
-      padding: 8px;
+      min-height: 116px;
+      padding: 10px;
     }
     .visual-all-card .visual-cell-thumb {
-      width: 70px;
-      height: 70px;
+      width: 92px;
+      height: 92px;
       aspect-ratio: auto;
     }
     .visual-all-card .score-badge {
-      font-size: 18px;
-      margin-top: 3px;
+      font-size: 21px;
+      margin-top: 4px;
     }
     .visual-all-card .pill {
       min-height: 28px;
@@ -409,7 +419,7 @@
       line-height: 1.1;
       overflow: hidden;
       -webkit-box-orient: vertical;
-      -webkit-line-clamp: 1;
+      -webkit-line-clamp: 2;
     }
     button, .button-link {
       display: inline-flex; align-items: center; justify-content: center; min-height: 56px; padding: 0 22px; border: 1px solid var(--ink); border-radius: 18px; text-decoration: none; color: #ffffff; font-weight: 600; cursor: pointer;
