@@ -239,6 +239,68 @@
       padding-top: 26px;
       border-top: 1px solid var(--line);
     }
+    .visual-dimension-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .visual-report-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
+      gap: 18px;
+      align-items: start;
+      margin-top: 18px;
+    }
+    .visual-cell-box {
+      position: absolute;
+      left: var(--left);
+      top: var(--top);
+      width: var(--width);
+      height: var(--height);
+      border: 2px solid rgba(255, 255, 255, 0.86);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.34), 0 0 18px rgba(236, 78, 55, 0.42);
+      pointer-events: none;
+    }
+    .visual-cell-box span {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 9px;
+      border-radius: 999px;
+      background: #11110f;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .visual-cell-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .visual-cell-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      padding: 12px;
+    }
+    .visual-cell-card.is-top {
+      border-color: rgba(236, 78, 55, 0.54);
+      box-shadow: 0 18px 38px rgba(236, 78, 55, 0.12);
+    }
+    .visual-cell-thumb {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+    }
     button, .button-link {
       display: inline-flex; align-items: center; justify-content: center; min-height: 56px; padding: 0 22px; border: 1px solid var(--ink); border-radius: 18px; text-decoration: none; color: #ffffff; font-weight: 600; cursor: pointer;
       background: var(--ink); box-shadow: none;
@@ -1582,6 +1644,9 @@
       .website-report-grid {
         grid-template-columns: 1fr;
       }
+      .visual-report-grid {
+        grid-template-columns: 1fr;
+      }
       .website-side {
         position: static;
       }
@@ -1604,6 +1669,7 @@
       .result-top,
       .compare-workspace,
       .compare-variant-grid,
+      .visual-report-grid,
       .single-analysis-layout.has-region-column {
         grid-template-columns: 1fr !important;
       }
@@ -1906,6 +1972,46 @@
           <div class="submit-progress-track"><span class="submit-progress-line"></span></div>
         </div>
       </form>
+      <form class="card upload-card" action="/review-visual-grid" method="post" enctype="multipart/form-data" data-analysis-form>
+        <div class="section-head">
+          <div>
+            <h2>{{ "Visual grid review" if language == "en" else "Разбор сетки визуалов" }}</h2>
+            <p class="muted upload-lead">{{ "Upload one image with several post covers, product shots, thumbnails, or ad visuals. The app ranks which options pull attention first." if language == "en" else "Загрузи одну картинку-сетку с вариантами поста, обложки, товара или рекламного визуала. Приложение покажет, что цепляет глаз сильнее." }}</p>
+          </div>
+          <div class="meta-row upload-meta">
+            <span class="pill">{{ "4–12 visuals" if language == "en" else "4–12 визуалов" }}</span>
+            <span class="pill">{{ "heatmap + ranking" if language == "en" else "heatmap + рейтинг" }}</span>
+            <span class="pill">{{ "no TRIBE video run" if language == "en" else "без прогона видео" }}</span>
+          </div>
+        </div>
+        <div class="upload-grid">
+          <div class="upload-field-col">
+            <div class="field-stack" style="margin-top: 14px;">
+              <input type="hidden" name="analysis_mode" value="deep">
+              <div class="file-picker" data-file-picker style="margin-top: 0;">
+                <input id="visual-grid-input" class="native-file-input" type="file" name="grid_image" accept="image/*" required>
+                <button type="button" class="file-picker-button" data-file-picker-trigger>{{ ui.choose_files }}</button>
+                <span class="file-picker-text" data-file-picker-text aria-live="polite">{{ ui.no_files_selected }}</span>
+              </div>
+              <div class="visual-dimension-grid">
+                <input class="url-input" type="number" min="1" max="6" name="grid_columns" placeholder="{{ 'Columns (optional)' if language == 'en' else 'Колонки (необязательно)' }}">
+                <input class="url-input" type="number" min="1" max="6" name="grid_rows" placeholder="{{ 'Rows (optional)' if language == 'en' else 'Ряды (необязательно)' }}">
+              </div>
+            </div>
+          </div>
+          <div class="upload-actions">
+            <button type="submit" data-submit-button data-busy-label="{{ 'Reading grid' if language == 'en' else 'Читаю сетку' }}">{{ "Analyze grid" if language == "en" else "Разобрать сетку" }}</button>
+          </div>
+          <p class="action-note">{{ "Leave rows/columns empty for auto-detect, or fill them in if the grid is unusual." if language == "en" else "Оставь ряды/колонки пустыми для автоопределения или укажи их вручную, если сетка нестандартная." }}</p>
+        </div>
+        <div class="submit-progress" data-submit-progress aria-live="polite">
+          <div class="submit-progress-head">
+            <span>{{ "Building the visual attention map..." if language == "en" else "Строю карту внимания визуалов..." }}</span>
+            <span>{{ "Usually fast" if language == "en" else "Обычно быстро" }}</span>
+          </div>
+          <div class="submit-progress-track"><span class="submit-progress-line"></span></div>
+        </div>
+      </form>
       {% endif %}
 
       {% if error %}
@@ -1913,7 +2019,106 @@
       {% endif %}
 
       {% if result %}
-      {% if result.source_kind == "website" %}
+      {% if result.source_kind == "visual_grid" %}
+      <div class="card">
+        <div class="result-top">
+          <div>
+            <div class="pill-row result-pills">
+              <p class="chip">Report {{ result.report_id }} В· {{ result.created_at }}</p>
+              <span class="pill">{{ "Visual grid review" if language == "en" else "Разбор сетки визуалов" }}</span>
+              <span class="pill">{{ result.visual_grid.summary.cells_count }} {{ "visuals" if language == "en" else "визуалов" }}</span>
+            </div>
+            <h2 style="margin-top: 10px;">{{ "Which visual grabs attention first?" if language == "en" else "Какой визуал цепляет первым?" }}</h2>
+            <p class="lead" style="font-size: 16px; max-width: 980px;">{{ "A fast attention pre-check for post covers, thumbnails, product cards, and ad visual options." if language == "en" else "Быстрая проверка внимания для обложек постов, превью, карточек товара и рекламных визуалов." }}</p>
+          </div>
+          {% if not pdf_mode %}
+          <div class="button-row result-actions">
+            <a class="button-link secondary" href="{{ result.report_url }}" target="_blank" rel="noopener">{{ ui.open_json }}</a>
+            <a class="button-link" href="{{ result.report_pdf_url }}">{{ ui.download_pdf }}</a>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="banner">{{ result.visual_grid.summary.note }}</div>
+
+        <div class="visual-report-grid">
+          <div>
+            <div class="website-layer-controls">
+              <button type="button" class="website-layer-button" data-website-layer-target="visual-grid-{{ result.report_id }}" data-website-layer="original">{{ "Original" if language == "en" else "Оригинал" }}</button>
+              <button type="button" class="website-layer-button is-active" data-website-layer-target="visual-grid-{{ result.report_id }}" data-website-layer="heatmap">{{ "Heatmap" if language == "en" else "Heatmap" }}</button>
+              <a class="button-link secondary" style="min-height: 38px; padding: 0 13px; border-radius: 999px;" href="{{ result.visual_grid.heatmap_url }}" download="{{ result.visual_grid.download_name }}">{{ "Download heatmap" if language == "en" else "Скачать heatmap" }}</a>
+            </div>
+            <div class="website-heatmap-frame">
+              <div class="website-image-stack" data-website-image="visual-grid-{{ result.report_id }}" data-layer="heatmap">
+                <img data-layer-image="original" src="{{ result.visual_grid.original_url }}" alt="Original visual grid">
+                <img data-layer-image="heatmap" src="{{ result.visual_grid.heatmap_url }}" alt="Visual grid attention heatmap">
+                {% for cell in result.visual_grid.cells %}
+                <div class="visual-cell-box" style="--left: {{ cell.box.left_percent }}%; --top: {{ cell.box.top_percent }}%; --width: {{ cell.box.width_percent }}%; --height: {{ cell.box.height_percent }}%;">
+                  <span>#{{ cell.rank }} · {{ cell.score }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <div class="website-side">
+            <div class="website-section-card">
+              <div class="chip">{{ "Winner" if language == "en" else "Победитель" }}</div>
+              <h3 style="margin-top: 12px;">{{ result.visual_grid.summary.top_label }}</h3>
+              <div class="big-number">{{ result.visual_grid.summary.top_score }}</div>
+              <p class="muted" style="margin-top: 8px;">{{ result.visual_grid.summary.columns }}×{{ result.visual_grid.summary.rows }} · {{ result.visual_grid.summary.image_size }}</p>
+            </div>
+            <div class="website-section-card">
+              <div class="chip">{{ "What to do" if language == "en" else "Что делать" }}</div>
+              <ul class="list" style="margin-top: 12px;">
+                {% for item in result.visual_grid.recommendations %}
+                <li>{{ item }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <div class="website-section-card">
+              <div class="chip">{{ "Top picks" if language == "en" else "Топ вариантов" }}</div>
+              <div class="visual-cell-grid">
+                {% for cell in result.visual_grid.top_picks %}
+                <div class="visual-cell-card is-top">
+                  <img class="visual-cell-thumb" src="{{ cell.crop_url }}" alt="{{ cell.label }}">
+                  <div class="pill-row" style="margin-top: 10px;">
+                    <span class="pill">#{{ cell.rank }}</span>
+                    <span class="pill">{{ cell.score }}/100</span>
+                  </div>
+                  <strong style="display:block; margin-top: 10px;">{{ cell.label }}</strong>
+                  <p class="muted" style="margin-top: 8px;">{{ cell.reasons[0] }}</p>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>{{ "All visual options" if language == "en" else "Все варианты" }}</h3>
+          <div class="visual-cell-grid">
+            {% for cell in result.visual_grid.cells %}
+            <div class="visual-cell-card{% if cell.rank <= 3 %} is-top{% endif %}">
+              <img class="visual-cell-thumb" src="{{ cell.crop_url }}" alt="{{ cell.label }}">
+              <div class="pill-row" style="margin-top: 10px;">
+                <span class="pill">{{ cell.label }}</span>
+                <span class="pill">#{{ cell.rank }}</span>
+              </div>
+              <div class="score-badge">{{ cell.score }}/100</div>
+              <div class="website-meter" style="--score: {{ cell.score }}%;"><span></span></div>
+              <ul class="list" style="margin-top: 12px;">
+                {% for reason in cell.reasons %}
+                <li>{{ reason }}</li>
+                {% endfor %}
+              </ul>
+              <p class="muted" style="margin-top: 10px;">{{ cell.risk }}</p>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% elif result.source_kind == "website" %}
       <div class="card">
         <div class="result-top">
           <div>
@@ -2500,20 +2705,20 @@
       }
 
       function bindFilePicker() {
-        const picker = document.querySelector("[data-file-picker]");
-        if (!picker) return;
-        const input = picker.querySelector(".native-file-input");
-        const trigger = picker.querySelector("[data-file-picker-trigger]");
-        const label = picker.querySelector("[data-file-picker-text]");
-        if (!input || !trigger || !label) return;
+        document.querySelectorAll("[data-file-picker]").forEach((picker) => {
+          const input = picker.querySelector(".native-file-input");
+          const trigger = picker.querySelector("[data-file-picker-trigger]");
+          const label = picker.querySelector("[data-file-picker-text]");
+          if (!input || !trigger || !label) return;
 
-        trigger.addEventListener("click", () => input.click());
-        input.addEventListener("change", () => {
-          if (!input.files || !input.files.length) {
-            label.textContent = noFilesSelectedLabel;
-            return;
-          }
-          label.textContent = Array.from(input.files).map((file) => file.name).join(", ");
+          trigger.addEventListener("click", () => input.click());
+          input.addEventListener("change", () => {
+            if (!input.files || !input.files.length) {
+              label.textContent = noFilesSelectedLabel;
+              return;
+            }
+            label.textContent = Array.from(input.files).map((file) => file.name).join(", ");
+          });
         });
       }
 

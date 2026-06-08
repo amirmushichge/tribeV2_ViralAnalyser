@@ -47,3 +47,16 @@ Use this when you want to check a landing page, hero section, product page, or b
 8. Adjust the hero, CTA, visual hierarchy, or clutter, then capture the page again.
 
 Website review mode is a practical layout check. It does not claim eye-tracking and does not replace real analytics or user testing.
+
+## Workflow D: pick from a visual grid
+
+Use this when you have several static visual options for a post, thumbnail, product card, or ad.
+
+1. Put the options into one image grid.
+2. Upload the grid into Visual grid review.
+3. Leave rows/columns empty for auto-detect, or set them manually if the grid is unusual.
+4. Compare the full-grid heatmap with the ranked cells.
+5. Start from the top pick, but read the reason cards before deciding.
+6. If two options score close, test both; the difference may depend on audience or caption.
+
+Visual grid review is an attention pre-check. It helps choose a stronger first visual, but it does not guarantee post, ad, or sales performance.

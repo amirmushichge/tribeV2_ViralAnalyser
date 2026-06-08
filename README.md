@@ -1,10 +1,12 @@
 # TRIBE Review MVP
 
-Private local web app for analyzing short video ads with Meta TRIBE v2 and presenting the result as an editing-friendly review. It also includes an experimental website review mode for landing-page attention maps.
+Private local web app for analyzing short video ads with Meta TRIBE v2 and presenting the result as an editing-friendly review. It also includes experimental website and visual-grid review modes for attention maps.
 
 The app runs the official TRIBE v2 inference path, visualizes the predicted brain-response curve and heatmap, and adds a practical recommendation layer for comparing cuts and finding weak moments in the timeline.
 
 Website review mode does not claim eye-tracking. It captures landing pages in a local browser and builds a visual attention estimate from page structure, contrast, color, and layout signals.
+
+Visual grid review mode is a fast attention pre-check for static creatives. It ranks options inside one uploaded image grid using visual salience signals; it does not claim guaranteed post or ad performance.
 
 ## Credits and sources
 
@@ -39,6 +41,8 @@ This repository is a non-commercial community prototype built around the officia
 - Shows original/heatmap toggles, fold markers, section scores, and layout recommendations.
 - Attempts to close common cookie/GDPR banners before website screenshots.
 - Compares two website URLs for before/after design checks.
+- Reviews one uploaded visual grid and ranks the strongest post, thumbnail, product, or ad options.
+- Shows a visual-grid heatmap, top picks, per-cell scores, and practical reasons.
 
 ## What it is not
 
@@ -105,6 +109,20 @@ Typical use:
 
 For before/after checks, paste a second URL in the optional compare field. The app compares the desktop and mobile attention scores side by side.
 
+### D. Pick from a visual grid
+
+Use visual grid mode when you made several static options and do not know which one to post first.
+
+Typical use:
+
+1. Put 4-12 visual options into one image grid.
+2. Upload that grid into Visual grid review.
+3. Leave rows/columns empty for auto-detect, or fill them manually for unusual grids.
+4. Compare the heatmap and top-3 ranked options.
+5. Use the text notes to understand whether the winner is stronger because of contrast, color, position, focus, or lower visual clutter.
+
+This is an attention pre-check, not a promise that the winning image will outperform everywhere.
+
 Full workflow notes: [docs/WORKFLOWS.md](docs/WORKFLOWS.md)
 
 ## Project structure
@@ -117,6 +135,7 @@ Full workflow notes: [docs/WORKFLOWS.md](docs/WORKFLOWS.md)
 |-- official_report.py             # Official-output report layer
 |-- review_engine.py               # Local recommendation and comparison logic
 |-- brain_visualization.py         # Brain heatmap visualization data
+|-- visual_grid_analysis.py        # Static visual-grid attention scoring
 |-- website_capture.py             # Local browser website screenshot capture
 |-- website_analysis.py            # Website attention heatmap and section scoring
 |-- report_localization.py         # UI/report copy layer
@@ -181,7 +200,7 @@ That folder is intentionally ignored by Git. Do not commit runtime media, report
 Run a syntax check:
 
 ```powershell
-python -m py_compile app.py bootstrap_models.py tribe_runtime.py speech_runtime.py official_report.py review_engine.py report_localization.py pdf_report.py brain_visualization.py runtime_setup.py website_capture.py website_analysis.py
+python -m py_compile app.py bootstrap_models.py tribe_runtime.py speech_runtime.py official_report.py review_engine.py report_localization.py pdf_report.py brain_visualization.py runtime_setup.py website_capture.py website_analysis.py visual_grid_analysis.py
 ```
 
 Run a smoke test with a local video:

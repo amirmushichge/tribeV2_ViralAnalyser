@@ -18,6 +18,8 @@ The first launch downloads Python packages, official TRIBE v2 model files, the W
 
 Website URL review requires Google Chrome or Microsoft Edge. The app uses the local browser only to capture screenshots of the page.
 
+Visual grid review works with normal image files such as PNG, JPG, JPEG, or WEBP.
+
 ## 1. Download
 
 1. Open the GitHub repository page.
@@ -67,6 +69,19 @@ The app captures:
 - optional before/after comparison when a second URL is provided
 
 This is not eye-tracking. It is a visual attention estimate for layout review.
+
+## Visual grid review
+
+Upload one image that contains several visual options in a grid.
+
+The app shows:
+
+- original and heatmap views
+- top-3 visual picks
+- per-cell attention scores
+- short reasons for why each option is stronger or weaker
+
+This is a fast attention pre-check for static creatives, not a guaranteed performance prediction.
 
 ## 5. Optional Hugging Face login
 

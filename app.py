@@ -30,6 +30,7 @@ from report_localization import (
 from review_engine import generate_comparison_report, generate_review
 from speech_runtime import SpeechTranscriber
 from tribe_runtime import TribeVideoBackend
+from visual_grid_analysis import build_visual_grid_report
 from website_analysis import build_website_attention_report
 from website_capture import capture_website_screenshot, get_viewport_config
 
@@ -103,6 +104,17 @@ async def get_media(report_id: str, variant_key: str) -> FileResponse:
 
 @app.get("/media/{report_id}/website/{asset_name}")
 async def get_website_asset(report_id: str, asset_name: str) -> FileResponse:
+    if not re.match(r"^[a-z0-9_-]+\.(?:png|jpg|jpeg)$", asset_name, re.IGNORECASE):
+        raise HTTPException(status_code=404, detail="Asset not found")
+    asset_path = MEDIA_DIR / report_id / asset_name
+    if not asset_path.exists():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    media_type = "image/png" if asset_path.suffix.lower() == ".png" else "image/jpeg"
+    return FileResponse(asset_path, media_type=media_type)
+
+
+@app.get("/media/{report_id}/assets/{asset_name}")
+async def get_image_asset(report_id: str, asset_name: str) -> FileResponse:
     if not re.match(r"^[a-z0-9_-]+\.(?:png|jpg|jpeg)$", asset_name, re.IGNORECASE):
         raise HTTPException(status_code=404, detail="Asset not found")
     asset_path = MEDIA_DIR / report_id / asset_name
@@ -231,6 +243,70 @@ async def review_website_url(
             "website": {
                 "variants": variants,
                 "comparison": _build_website_comparison(variants),
+            },
+            "analysis_mode": {"key": selected_analysis_mode, "label": selected_analysis_mode},
+        }
+        _store_report(report_id, result)
+        return _render_page(
+            request,
+            result=_get_localized_report(result, language),
+            error=None,
+            language=language,
+        )
+    except Exception as exc:
+        return _render_page(
+            request,
+            result=None,
+            error=_format_error(exc, language),
+            language=language,
+            status_code=500,
+        )
+
+
+@app.post("/review-visual-grid", response_class=HTMLResponse)
+async def review_visual_grid(
+    request: Request,
+    grid_image: UploadFile = File(...),
+    grid_columns: int | None = Form(None),
+    grid_rows: int | None = Form(None),
+    analysis_mode: str = Form(DEFAULT_ANALYSIS_MODE),
+    lang: str | None = None,
+) -> HTMLResponse:
+    report_id = uuid4().hex[:12]
+    report_media_dir = MEDIA_DIR / report_id
+    language = normalize_report_language(lang)
+    selected_analysis_mode = _normalize_analysis_mode(analysis_mode)
+
+    try:
+        if not grid_image.filename:
+            raise ValueError("Upload one image that contains a grid of visual options.")
+        suffix = Path(grid_image.filename).suffix.lower() or ".png"
+        if suffix not in {".png", ".jpg", ".jpeg", ".webp"}:
+            raise ValueError("Upload a normal image file: PNG, JPG, JPEG, or WEBP.")
+        report_media_dir.mkdir(parents=True, exist_ok=True)
+        upload_path = report_media_dir / f"visual-grid-upload{suffix}"
+        upload_path.write_bytes(await grid_image.read())
+
+        visual = build_visual_grid_report(
+            upload_path,
+            report_media_dir,
+            columns=grid_columns,
+            rows=grid_rows,
+        )
+        result = {
+            "mode": "visual_grid",
+            "source_kind": "visual_grid",
+            "report_id": report_id,
+            "created_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+            "title": Path(grid_image.filename).stem or "Visual grid",
+            "visual_grid": {
+                "original_url": f"/media/{report_id}/assets/{visual.original_path.name}",
+                "heatmap_url": f"/media/{report_id}/assets/{visual.heatmap_path.name}",
+                "download_name": visual.heatmap_path.name,
+                "summary": visual.summary,
+                "cells": _with_visual_asset_urls(report_id, visual.cells),
+                "top_picks": _with_visual_asset_urls(report_id, visual.top_picks),
+                "recommendations": visual.recommendations,
             },
             "analysis_mode": {"key": selected_analysis_mode, "label": selected_analysis_mode},
         }
@@ -433,6 +509,17 @@ def _build_website_comparison(variants: list[dict[str, Any]]) -> dict[str, Any] 
             }
         )
     return {"rows": rows}
+
+
+def _with_visual_asset_urls(report_id: str, cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    enriched = []
+    for cell in cells:
+        item = deepcopy(cell)
+        crop_name = item.get("crop_name")
+        if crop_name:
+            item["crop_url"] = f"/media/{report_id}/assets/{crop_name}"
+        enriched.append(item)
+    return enriched
 
 
 def _refresh_comparison_report(report: dict) -> dict:
